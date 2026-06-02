@@ -24,6 +24,7 @@ RED = "\033[91m"
 YELLOW = "\033[93m"
 GREY = "\033[90m"
 WHITE = "\033[97m"
+MAGENTA = "\033[95m"
 
 CYCLE_ORDER = ["bitget", "deposit", "trade", "withdraw", "bitget_return"]
 MOD_NAME = {
@@ -119,7 +120,7 @@ def _render(cfg, rows, cursor):
     print(f"{CYAN}{BOLD}{bar}{RESET}")
     print(f"{CYAN}{BOLD}   Bitget → Unit → Hyperliquid → вывод{RESET}")
     print(f"{CYAN}{BOLD}{bar}{RESET}")
-    print(f"  {CYAN}TG-канал: https://t.me/thatcryptofriend{RESET}")
+    print(f"  {MAGENTA}TG-канал: https://t.me/thatcryptofriend{RESET}")
     print(f"  кошельки из {WHITE}wallets.xlsx{RESET}")
     rpc = "свой (.env)" if cfg.eth_rpc_url else "публичный"
     bg = f"{GREEN}есть{RESET}" if all(cfg.bitget.values()) else f"{RED}нет{RESET}"
