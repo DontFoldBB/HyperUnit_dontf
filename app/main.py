@@ -357,6 +357,7 @@ def print_header(cfg):
     print(C.header("=" * 64))
     print(C.header("  ОБЪЕДИНЁННЫЙ СКРИПТ:  Bitget → Unit → Hyperliquid → Bitget"))
     print(C.header("=" * 64))
+    print(C.bold("  TG-канал: https://t.me/thatcryptofriend"))
     print(f"  Кошельки: {C.bold('wallets.xlsx')} (1 строка = 1 аккаунт)")
     rpc = "свой (из .env)" if cfg.eth_rpc_url else "публичный по умолчанию"
     bg = "заданы" if all(cfg.bitget.values()) else "НЕ заданы (нужны для Bitget)"

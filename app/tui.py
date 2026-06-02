@@ -119,6 +119,7 @@ def _render(cfg, rows, cursor):
     print(f"{CYAN}{BOLD}{bar}{RESET}")
     print(f"{CYAN}{BOLD}   Bitget → Unit → Hyperliquid → вывод{RESET}")
     print(f"{CYAN}{BOLD}{bar}{RESET}")
+    print(f"  {CYAN}TG-канал: https://t.me/thatcryptofriend{RESET}")
     print(f"  кошельки из {WHITE}wallets.xlsx{RESET}")
     rpc = "свой (.env)" if cfg.eth_rpc_url else "публичный"
     bg = f"{GREEN}есть{RESET}" if all(cfg.bitget.values()) else f"{RED}нет{RESET}"
