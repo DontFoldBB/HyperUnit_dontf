@@ -1,0 +1,38 @@
+# ============================================================
+#  СЕКРЕТЫ И ЛИЧНЫЕ ДАННЫЕ
+#  Из config/ НЕ коммитим НИЧЕГО, кроме шаблонов *.example.*
+# ============================================================
+config/*
+!config/.env.example
+!config/*.example.json
+!config/*.example.xlsx
+
+# .env где угодно (на всякий случай)
+.env
+*.key
+*.pem
+
+# Отчёты прогонов (адреса, суммы)
+output/*
+!output/.gitkeep
+
+# Журналы/кэши вендоренных модулей (пишутся в lib/ при работе)
+lib/*.csv
+lib/*.log
+lib/.min_cache.json
+deposits_log.csv
+withdrawals*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Логи / временные / мусор ОС
+*.log
+.~lock.*#
+~$*
+*.tmp
+системный
