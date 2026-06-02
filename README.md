@@ -1,124 +1,125 @@
-# HyperUnit — авто-цикл Bitget → Hyperliquid → Bitget
+**English** · [Русский](README.ru.md)
 
-Скрипт сам по списку кошельков прогоняет весь круг и набивает объём на Hyperliquid:
+# HyperUnit — auto-cycle Bitget → Hyperliquid → Bitget
 
-1. выводит ETH с **Bitget** на твой кошелёк;
-2. заводит часть на **Hyperliquid** через мост **Unit**;
-3. **торгует / набивает объём** (HIP-3 на trade.xyz и/или перпы);
-4. выводит обратно в Ethereum через Unit;
-5. **возвращает ETH на Bitget** и сводит на мейн-аккаунт — и переходит к следующему кошельку из списка.
+For each wallet in your list the script runs the full loop and builds volume on Hyperliquid:
 
----
-
-## Что нужно заранее
-
-- **Windows** и **Python 3.10+**. При установке Python поставь галочку *«Add Python to PATH»*.
-  Проверка: открой терминал (PowerShell) и набери `python --version` — должна показаться версия.
-- **Аккаунт Bitget** с API-ключом: права **Spot** + **Withdraw**, и твой IP добавлен в **whitelist** ключа.
-- **Приватные ключи** кошельков.
+1. withdraws ETH from **Bitget** to your wallet;
+2. bridges part of it to **Hyperliquid** via the **Unit** bridge;
+3. **trades / builds volume** (HIP-3 on trade.xyz and/or perps);
+4. withdraws back to Ethereum via Unit;
+5. **returns ETH to Bitget** and sweeps to the main account — then moves on to the next wallet in the list.
 
 ---
 
-## Установка — по шагам
+## What you need first
 
-### Шаг 1. Поставить зависимости
-Открой терминал (PowerShell) **в папке проекта** и выполни:
+- **Windows** and **Python 3.10+**. When installing Python, tick *“Add Python to PATH”*.
+  Check: open a terminal (PowerShell) and run `python --version` — it should print a version.
+- A **Bitget account** with an API key: **Spot** + **Withdraw** permissions, and your IP added to the key's **whitelist**.
+- **Private keys** of your wallets.
+
+---
+
+## Setup — step by step
+
+### Step 1. Install dependencies
+Open a terminal (PowerShell) **in the project folder** and run:
 ```powershell
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 ```
-Это создаст локальное окружение `.venv` — `ЗАПУСТИТЬ.bat` потом найдёт его сам.
+This creates a local `.venv` — `ЗАПУСТИТЬ.bat` will find it automatically.
 
-### Шаг 2. Ключи Bitget — файл `config\.env`
-Файл **`config\.env`** уже лежит в папке — открой его блокнотом и впиши свои ключи (без кавычек, без пробелов вокруг `=`):
+### Step 2. Bitget keys — file `config\.env`
+The **`config\.env`** file is already in the folder — open it in a text editor and fill in your keys (no quotes, no spaces around `=`):
 ```
-BITGET_API_KEY=сюда_ключ
-BITGET_API_SECRET=сюда_секрет
-BITGET_API_PASSPHRASE=сюда_passphrase
-ETH_RPC_URL=            ← можно оставить пустым (будут публичные ноды)
+BITGET_API_KEY=your_key
+BITGET_API_SECRET=your_secret
+BITGET_API_PASSPHRASE=your_passphrase
+ETH_RPC_URL=            ← can be left empty (public nodes will be used)
 ```
 
-### Шаг 3. Кошельки — файл `config\wallets.xlsx`
-Открой **`config\wallets.xlsx`** в Excel и заполни:
-- **столбец A** — приватный ключ кошелька (`0x...`);
-- **столбец B** — адрес депозита **ETH** на Bitget (куда вернуть деньги в конце круга).
-- **Одна строка = один аккаунт.** Сколько строк — столько аккаунтов прогонит по очереди.
-  Строку-заголовок можно оставить — она пропускается.
+### Step 3. Wallets — file `config\wallets.xlsx`
+Open **`config\wallets.xlsx`** in Excel and fill in:
+- **column A** — wallet private key (`0x...`);
+- **column B** — the ETH deposit address on Bitget (where funds return at the end of the loop).
+- **One row = one account.** As many rows as accounts to run, one after another. The header row can stay — it's skipped.
 
-### Шаг 4. Параметры — файл `config\config.json` (самое важное)
-Открой **`config\config.json`** и настрой под себя — здесь задаётся, **что и сколько делать**. Внутри файла каждая строка подписана; комментарии `//` и `#` разрешены.
+### Step 4. Parameters — file `config\config.json` (the most important)
+Open **`config\config.json`** and tune it — this is where you set **what and how much to do**. Every line is documented inside the file; `//` and `#` comments are allowed.
 
-**Вилки.** Многие числа можно задать «вилкой» — значение выбирается случайно (своё на каждый кошелёк/сделку), чтобы суммы были неровные: `"90-95"` = случайно между 90 и 95; просто число (`90`) = фиксировано.
+**Ranges.** Many numbers can be given as a “range” — the value is picked randomly (a separate one per wallet/trade) so amounts aren't round: `"90-95"` = random between 90 and 95; a plain number (`90`) = fixed.
 
-**Сколько денег гонять:**
-- `bitget_amount_eth` — сколько вывести с Bitget на кошелёк: `"0.01"` (столько ETH), `"all"` (весь баланс) или `"80-100%"` (случайный % баланса);
-- `deposit_percent` — какой % завести на Hyperliquid через Unit (напр. `"90-95"`);
-- `withdraw_amount` — сколько потом вывести с Hyperliquid: `"all"` или вилка вроде `"50-70%"`;
-- `bitget_return_percent` — сколько вернуть на Bitget (`100` = всё минус газ).
+**How much money to move:**
+- `bitget_amount_eth` — how much to withdraw from Bitget per wallet: `"0.01"` (that much ETH), `"all"` (full balance) or `"80-100%"` (random % of balance);
+- `deposit_percent` — what % to bridge to Hyperliquid via Unit (e.g. `"90-95"`);
+- `withdraw_amount` — how much to then withdraw from Hyperliquid: `"all"` or a range like `"50-70%"`;
+- `bitget_return_percent` — how much to return to Bitget (`100` = everything minus gas).
 
-**Что торговать:**
-- `trade_hip3` — список HIP-3 активов (trade.xyz), напр. `["NVDA","TSLA","GOLD"]`. `[]` = не торговать HIP-3;
-- `trade_perp` — перпы: `"none"` (выкл), `"pair"` (BTC+ETH вместе) или `"single"` (крутит пул перпов по одному);
-- `trade_single_coin` — пул перпов для режима `"single"`, напр. `["BTC","SOL","XRP"]`.
+**What to trade:**
+- `trade_hip3` — list of HIP-3 assets (trade.xyz), e.g. `["NVDA","TSLA","GOLD"]`. `[]` = don't trade HIP-3;
+- `trade_perp` — perps: `"none"` (off), `"pair"` (BTC+ETH together) or `"single"` (cycles a pool of perps one by one);
+- `trade_single_coin` — pool of perps for `"single"` mode, e.g. `["BTC","SOL","XRP"]`.
 
-**Сколько объёма набить (в $):**
-- `trade_target_hip3` — целевой объём $ на HIP-3 активах;
-- `trade_target_perp` — целевой объём $ на перпах.
-- Скрипт открывает и закрывает позиции, **пока не наберёт эту сумму**. Поставишь **`0` — будет один проход** (просто откроет и сразу закроет одну позицию, без набора объёма).
+**How much volume to build (in $):**
+- `trade_target_hip3` — target $ volume on HIP-3 assets;
+- `trade_target_perp` — target $ volume on perps.
+- The script opens and closes positions **until it reaches this amount**. Set **`0` — one pass** (just opens and immediately closes one position, no volume building).
 
-**Как именно крутить:**
-- `trade_margin_pct` — какую долю средств брать в маржу на одну сделку, % (напр. `"50-95"`);
-- `trade_leverage` — плечо (напр. `"5-7"`; для перпов округляется до целого);
-- `trade_hold_minutes` — сколько **держать каждую позицию, в минутах** (`[0.5, 2]` = случайно 0.5–2 мин);
-- `trade_gap_minutes` — **пауза между сделками, в минутах** (`[0.2, 1]` = случайно 0.2–1 мин).
+**Exactly how to trade:**
+- `trade_margin_pct` — what share of funds to use as margin per trade, % (e.g. `"50-95"`);
+- `trade_leverage` — leverage (e.g. `"5-7"`; rounded to an integer for perps);
+- `trade_hold_minutes` — how long to **hold each position, in minutes** (`[0.5, 2]` = random 0.5–2 min);
+- `trade_gap_minutes` — **pause between trades, in minutes** (`[0.2, 1]` = random 0.2–1 min).
 
-**Остальное:**
-- `modules` (вверху файла) — какие из 5 шагов включены (`true/false`); то же можно галочками в меню при запуске;
-- `advanced` — таймауты ожиданий и паузы между шагами/кошельками;
+**The rest:**
+- `modules` (top of the file) — which of the 5 steps are enabled (`true/false`); can also be toggled in the menu at launch;
+- `advanced` — wait timeouts and pauses between steps/wallets.
 
 ---
 
-## Запуск
+## Run
 
-**Двойной клик по `ЗАПУСТИТЬ.bat`** (или в терминале: `python run.py`).
+**Double-click `ЗАПУСТИТЬ.bat`** (or in a terminal: `python run.py`).
 
-Откроется меню со стрелками:
+An arrow-key menu opens (the in-app menu is in Russian):
 ```
-  кошельки из wallets.xlsx
-  ► [✓] Вывод ETH с Bitget
-    [✓] Депозит на Hyperliquid (Unit)
-    [✓] Торговля / набивка объёма
-    [✓] Вывод ETH с Hyperliquid (Unit)
-    [✓] Возврат ETH на Bitget
-        ▶ ЗАПУСТИТЬ по wallets.xlsx
-        Выход
+  wallets from wallets.xlsx
+  ► [✓] Withdraw ETH from Bitget
+    [✓] Deposit to Hyperliquid (Unit)
+    [✓] Trade / build volume
+    [✓] Withdraw ETH from Hyperliquid (Unit)
+    [✓] Return ETH to Bitget
+        ▶ RUN over wallets.xlsx
+        Exit
 ```
-- **↑ / ↓** — двигаться по списку.
-- **Enter / Пробел** — включить/выключить модуль или нажать «Запустить».
-- **q** — выход. Галочки сохраняются автоматически.
-- «Запустить» прогонит включённые шаги **по всем кошелькам** из `wallets.xlsx`, по очереди.
+- **↑ / ↓** — move through the list.
+- **Enter / Space** — toggle a module or press “Run”.
+- **q** — exit. Checkboxes are saved automatically.
+- “Run” executes the enabled steps **over all wallets** from `wallets.xlsx`, one by one.
 
 ---
 
-## Где смотреть результаты
+## Where to see results
 
-Папка **`output\`** (создаётся сама):
-- `runs_log.txt` — по-человечески, что произошло на каждом аккаунте (вывод, депозит, объёмы, комиссии);
-- `runs.csv` / `accounts.csv` — то же для Excel;
-- ключевая цифра — **объём, прогнанный через Unit** (депозит + вывод) и общие комиссии.
-
----
-
-## Полезно знать
-
-- **Один аккаунт Bitget на все кошельки** (ключи в `.env`), а EVM-кошельки берутся из `wallets.xlsx`.
-- Каждый адрес кошелька нужно добавить в **whitelist вывода** на Bitget. Если адрес не добавлен — на шаге вывода скрипт остановится, напишет об этом и будет ждать: добавляешь адрес в вайтлист и жмёшь Enter, чтобы продолжить (или пропускаешь этот кошелёк).
-- Минимум для моста Unit ~0.007 ETH. Первый вывод на новый адрес стоит ~1 USDC — скрипт сам оставляет резерв.
-- Между шагами скрипт ждёт реальных зачислений (Bitget → кошелёк, мост Unit) — это нормально, может занять несколько минут.
+The **`output\`** folder (created automatically):
+- `runs_log.txt` — human-readable: what happened on each account (withdraw, deposit, volumes, fees);
+- `runs.csv` / `accounts.csv` — the same for Excel;
+- the key figure — **volume run through Unit** (deposit + withdrawal) and total fees.
 
 ---
 
-## Что в папке (для справки)
+## Good to know
 
-- `config\` — настройки (`.env`, `config.json`, `wallets.xlsx`) — заполняешь прямо тут. В репозитории они лежат пустыми; твои заполненные значения в git не уходят.
-- `app\` — код запуска и меню; `lib\` — модули операций (Bitget / Unit / Hyperliquid); `output\` — отчёты.
+- **One Bitget account for all wallets** (keys in `.env`), while the EVM wallets come from `wallets.xlsx`.
+- Each wallet address must be added to the **withdrawal whitelist** on Bitget. If an address isn't added — at the withdrawal step the script stops, tells you, and waits: add the address to the whitelist and press Enter to continue (or skip that wallet).
+- The Unit bridge minimum is ~0.007 ETH. The first withdrawal to a new address costs ~1 USDC — the script keeps a reserve for it.
+- Between steps the script waits for real credits (Bitget → wallet, Unit bridge) — that's normal, it can take a few minutes.
+
+---
+
+## What's in the folder (for reference)
+
+- `config\` — settings (`.env`, `config.json`, `wallets.xlsx`) — fill them in right here. They're empty in the repository; your filled-in values don't go to git.
+- `app\` — launch code and menu; `lib\` — operation modules (Bitget / Unit / Hyperliquid); `output\` — reports.
