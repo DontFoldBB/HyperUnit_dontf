@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ОБЪЕДИНЁННЫЙ СКРИПТ: Bitget → Unit-депозит → торговля Hyperliquid → Unit-вывод.
+HyperUnit: Bitget → Unit-депозит → торговля Hyperliquid → Unit-вывод.
 
 Один кошелёк (PRIVATE_KEY) на все стадии. Все параметры — в config.json,
 секреты — в .env. Запусти и выбери стадию в меню (или прогон всего цикла).
@@ -355,7 +355,7 @@ def run_stage_list(keys, cfg, live, is_cycle, assume_yes):
 # --------------------------------------------------------------------------- #
 def print_header(cfg):
     print(C.header("=" * 64))
-    print(C.header("  ОБЪЕДИНЁННЫЙ СКРИПТ:  Bitget → Unit → Hyperliquid → Bitget"))
+    print(C.header("  HyperUnit  ·  Bitget → Unit → Hyperliquid → Bitget"))
     print(C.header("=" * 64))
     print(C.bold("  TG-канал: https://t.me/thatcryptofriend"))
     print(f"  Кошельки: {C.bold('wallets.xlsx')} (1 строка = 1 аккаунт)")
@@ -550,7 +550,7 @@ def menu_loop(cfg, args):
 #  main                                                                       #
 # --------------------------------------------------------------------------- #
 def main():
-    p = argparse.ArgumentParser(description="Объединённый скрипт Bitget/Unit/Hyperliquid (по wallets.xlsx)")
+    p = argparse.ArgumentParser(description="HyperUnit: Bitget/Unit/Hyperliquid по wallets.xlsx")
     p.add_argument("--stage", help="1..5 | bitget|deposit|trade|withdraw|bitget_return | cycle — "
                                     "прогнать эту стадию/цикл по ВСЕМ кошелькам из wallets.xlsx")
     args = p.parse_args()
