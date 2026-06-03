@@ -159,7 +159,7 @@ def wait_credit_and_sweep(coin, expected_eth, poll_s=20, timeout_s=0, log=print)
         for uid, b1 in subs1.items():
             inc = b1 - subs0.get(uid, Decimal(0))
             if inc >= target:
-                log(f"  ↪ пришло на субакк {uid}: +{_amt(inc)} {coin} — свожу на мейн (жду разморозки)…")
+                log(f"  ↪ пришло на субакк {uid}: +{_amt(inc)} {coin} — перевожу на мейн (жду разморозки депозита)…")
                 moved = sweep_sub_to_main(coin, uid, muid, first_delay=120, poll_s=30, log=log)
                 return ("main" if moved > 0 else f"sub:{uid}"), (moved if moved > 0 else inc)
         if timeout_s and el >= timeout_s:
