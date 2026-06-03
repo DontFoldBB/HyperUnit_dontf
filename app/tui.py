@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Цветное меню со стрелками (Windows, без сторонних библиотек).
+Цветное меню со стрелками (Windows / Linux / macOS, без сторонних библиотек).
 
   ↑/↓ (или k/j) — выбор строки
   Enter / Пробел — переключить модуль / режим, либо «запустить»
@@ -39,19 +39,23 @@ MOD_NAME = {
 
 
 def supported():
-    """Можно ли рисовать стрелочное меню (Windows + интерактивный терминал)."""
-    if os.name != "nt":
-        return False
+    """Можно ли рисовать стрелочное меню (интерактивный терминал: Windows, Linux или macOS)."""
     try:
         if not (sys.stdin.isatty() and sys.stdout.isatty()):
             return False
-        import msvcrt  # noqa: F401
+        if os.name == "nt":
+            import msvcrt  # noqa: F401
+        else:
+            import termios  # noqa: F401  (Linux/macOS: посимвольное чтение клавиш)
     except Exception:
         return False
     return True
 
 
 def _enable_ansi():
+    # На Unix (Linux/macOS) ANSI работает из коробки — включать ничего не нужно.
+    if os.name != "nt":
+        return
     try:
         import ctypes
         k = ctypes.windll.kernel32
@@ -77,7 +81,17 @@ def _exit_fullscreen():
     sys.stdout.flush()
 
 
+# ANSI-коды стрелок (Unix): после ESC идёт "[A"/"[B"/… или "OA"/"OB"/… -> наши имена
+_ARROW_SEQ = {"[A": "up", "[B": "down", "[C": "right", "[D": "left",
+              "OA": "up", "OB": "down", "OC": "right", "OD": "left"}
+
+
 def _getkey():
+    """Одно нажатие -> 'up'/'down'/'left'/'right'/'enter'/'space'/'esc'/буква."""
+    return _getkey_nt() if os.name == "nt" else _getkey_posix()
+
+
+def _getkey_nt():
     import msvcrt
     ch = msvcrt.getwch()
     if ch in ("\x00", "\xe0"):                     # спец-клавиша: стрелки и т.п.
@@ -92,6 +106,32 @@ def _getkey():
     if ch == "\x03":
         raise KeyboardInterrupt
     return ch.lower()
+
+
+def _getkey_posix():
+    import termios
+    import tty
+    import select
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(fd)                          # посимвольно, без эха; Ctrl+C остаётся сигналом
+        ch = os.read(fd, 1).decode("utf-8", "ignore")
+        if ch in ("\r", "\n"):
+            return "enter"
+        if ch == " ":
+            return "space"
+        if ch == "\x03":                           # подстраховка (обычно ловится как SIGINT)
+            raise KeyboardInterrupt
+        if ch == "\x1b":                           # ESC: либо сама Esc, либо начало стрелки
+            r, _, _ = select.select([fd], [], [], 0.05)
+            if not r:                              # больше байт нет — это была Esc
+                return "esc"
+            seq = os.read(fd, 2).decode("utf-8", "ignore")
+            return _ARROW_SEQ.get(seq, "")
+        return ch.lower()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
 def _cycle_str(cfg):
