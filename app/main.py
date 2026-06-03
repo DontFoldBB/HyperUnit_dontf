@@ -384,7 +384,8 @@ def _run_wallets(cfg, args, keys):
         wallets = wallets_xlsx.read_wallets(cfg.wallets_file or None)
     except Exception as e:
         print(C.err(f"Список кошельков не прочитан: {e}"))
-        print(C.dim(f"  Заполни {wallets_xlsx.DEFAULT_FILE}: A — приватник, B — адрес депозита Bitget."))
+        print(C.dim(f"  Скопируй wallets.example.xlsx → {wallets_xlsx.DEFAULT_FILE} и заполни: "
+                    "A — приватник, B — адрес депозита Bitget."))
         return
     wallets = [w for w in wallets if w.get("private_key")]
     if not wallets:

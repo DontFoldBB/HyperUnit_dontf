@@ -1,9 +1,16 @@
 # ============================================================
-#  В репозитории лежат ПУСТЫЕ заготовки config/.env, config.json,
-#  wallets.xlsx — их можно заполнять прямо на месте. Твои заполненные
-#  значения НЕ попадают в git (на .env и wallets.xlsx стоит skip-worktree).
-#  Не отслеживаем только локи/бэкапы/мусор:
+#  Реальные настройки лежат локально и НЕ отслеживаются git.
+#  Возьми примеры рядом и скопируй БЕЗ ".example":
+#    config/.env.example          ->  config/.env
+#    config/config.example.json   ->  config/config.json
+#    config/wallets.example.xlsx  ->  config/wallets.xlsx
+#  Затем впиши свои значения — они останутся только у тебя.
 # ============================================================
+config/.env
+config/config.json
+config/wallets.xlsx
+
+# Локи/бэкапы/мусор рядом с конфигом:
 config/.~lock.*#
 config/~$*
 config/*.bak
