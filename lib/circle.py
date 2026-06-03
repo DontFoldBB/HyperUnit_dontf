@@ -379,8 +379,14 @@ def wait(mins, what, live):
 # ----------------------------- круг ----------------------------- #
 def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, perp_arg,
         pct, lev, target_hip3, target_perp, hold, gap, live, log_csv=True, reserve_usdc=RESERVE_USDC,
-        jitter=0.0, random_pick=False):
+        jitter=0.0, random_pick=False, builder=None):
     rows: List[List[Any]] = []
+    # builder-комиссия: подставить builder во ВСЕ ордера этого аккаунта (если включена).
+    # Выключено (builder=None) -> обёрток нет, поведение 1-в-1 прежнее.
+    if builder:
+        _bo, _bc = ex.market_open, ex.market_close
+        ex.market_open = lambda *a, **k: _bo(*a, **{"builder": builder, **k})
+        ex.market_close = lambda *a, **k: _bc(*a, **{"builder": builder, **k})
     ueth_before = spot_free(info, addr, ETH_TOKEN)
     usdc_before = spot_free(info, addr, "USDC")
     spot_px = get_mid(info, spot_coin)
@@ -655,13 +661,22 @@ def _pick(val, integer=False):
     return val
 
 
+def _builder_pct(fee, default=0.01):
+    """'0.01%' | '0.01' | 0.01 -> процент как float (0.01). Мусор -> default."""
+    try:
+        return float(str(fee).strip().rstrip("%").strip())
+    except Exception:
+        return default
+
+
 def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_coin: str = None,
                pct: float = 50, leverage=2, target_hip3: float = 0, target_perp: float = 0,
                hold_minutes=0.2, gap_minutes=0.1, live: bool = False,
                account_address: str = None, base_url: str = constants.MAINNET_API_URL,
                log_csv: bool = True, reserve_usdc: float = RESERVE_USDC,
                hip3_count: int = None, shuffle: bool = False,
-               size_jitter: float = 0.0, random_pick: bool = False) -> dict:
+               size_jitter: float = 0.0, random_pick: bool = False,
+               builder_enabled: bool = False, builder_address: str = "", builder_fee="0.01%") -> dict:
     """
     Прогнать круг программно (без вопросов в консоли). Возвращает dict с результатом
     (см. ключи в конце run(): ok, volume, positions_left, spent_usd, ...).
@@ -693,6 +708,22 @@ def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_co
                     набивая target_hip3; список = пул, из которого выбираем.
     """
     ex, info, addr, spot_coin, spot_szdec, specs = setup_account(private_key, account_address, base_url)
+
+    # Builder-комиссия (монетизация): один раз approve на этот кошелёк + builder во все ордера.
+    builder = None
+    if builder_enabled and str(builder_address).strip():
+        b_addr = str(builder_address).strip().lower()
+        pct_b = _builder_pct(builder_fee)
+        f_int = max(1, int(round(pct_b * 1000)))      # десятые доли б.п.: 0.01% -> 10
+        if live:
+            try:
+                ex.approve_builder_fee(b_addr, f"{pct_b:g}%")
+                print(f"[run_circle] builder-fee: {b_addr} ~{pct_b:g}% (approve ок)")
+            except Exception as e:
+                print(f"[run_circle] approve_builder_fee не прошёл: {e} — продолжаю без builder-комиссии")
+                b_addr = None
+        if b_addr:
+            builder = {"b": b_addr, "f": f_int}
 
     norm = []
     for a in (hip3_assets or []):
@@ -740,7 +771,7 @@ def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_co
     return run(ex, info, addr, spot_coin, spot_szdec, specs, norm, perp_kind, perp_arg,
                float(pct), lev_use, float(target_hip3), float(target_perp), hold_minutes,
                gap_minutes, bool(live), log_csv=log_csv, reserve_usdc=float(reserve_usdc),
-               jitter=float(size_jitter), random_pick=bool(random_pick))
+               jitter=float(size_jitter), random_pick=bool(random_pick), builder=builder)
 
 
 # ----------------------------- main (интерактив) ----------------------------- #

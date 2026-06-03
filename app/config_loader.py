@@ -165,6 +165,12 @@ class Config:
         self.wallets_file = (js.get("batch_wallets_file") or "").strip()
         # перемешивать ли порядок кошельков из wallets.xlsx на каждом запуске
         self.randomize_wallets = bool(js.get("randomize_wallets", False))
+        # Builder-комиссия Hyperliquid (монетизация): % с каждого ордера в пользу builder_address.
+        self.builder = {
+            "enabled": bool(js.get("builder_codes", False)),
+            "address": (js.get("builder_address") or "").strip(),
+            "fee": js.get("builder_fee", "0.01%"),
+        }
 
         # --- вкл/выкл модулей ---
         self.enabled = {
@@ -255,6 +261,7 @@ def clone_for_wallet(cfg, private_key, bitget_address):
     w.trade_cfg = dict(cfg.trade_cfg)
     w.withdraw_cfg = dict(cfg.withdraw_cfg)
     w.return_cfg = dict(cfg.return_cfg)
+    w.builder = dict(getattr(cfg, "builder", {}))
     # Вилки ("90-95", [50,95]) -> своё число НА КАЖДЫЙ кошелёк: неровные и разные суммы.
     w.deposit_cfg["percent"] = _pick_num(cfg.deposit_cfg.get("percent"))
     w.trade_cfg["pct"] = _pick_num(cfg.trade_cfg.get("pct"))
