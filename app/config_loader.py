@@ -163,6 +163,8 @@ class Config:
         self.module_gap_sec = adv.get("module_gap_sec", [5, 15])
         # батч: путь к Excel со списком кошельков ("" = combined/wallets.xlsx)
         self.wallets_file = (js.get("batch_wallets_file") or "").strip()
+        # перемешивать ли порядок кошельков из wallets.xlsx на каждом запуске
+        self.randomize_wallets = bool(js.get("randomize_wallets", False))
 
         # --- вкл/выкл модулей ---
         self.enabled = {
@@ -301,11 +303,26 @@ def _set_module_bool(text, key, value):
     return text[:start] + new_region + text[end:]
 
 
+def _set_or_add_top_bool(text, key, value):
+    """Заменить top-level "key": true/false; если ключа нет — добавить сразу после '{'."""
+    val = "true" if value else "false"
+    new, n = re.subn(r'("%s"\s*:\s*)(?:true|false)' % re.escape(key),
+                     r"\g<1>" + val, text, count=1)
+    if n:
+        return new
+    idx = text.find("{")
+    if idx == -1:
+        return text
+    return text[:idx + 1] + ('\n  "%s": %s,' % (key, val)) + text[idx + 1:]
+
+
 def save_toggles(cfg, path=CONFIG_PATH):
-    """Сохранить live и modules.* в config.json, сохранив комментарии и остальное."""
+    """Сохранить modules.* и randomize_wallets в config.json, сохранив комментарии и остальное."""
     with open(path, "r", encoding="utf-8") as fh:
         text = fh.read()
     for key in ("bitget", "deposit", "trade", "withdraw", "bitget_return"):
         text = _set_module_bool(text, key, cfg.enabled.get(key, True))
+    text = _set_or_add_top_bool(text, "randomize_wallets",
+                                getattr(cfg, "randomize_wallets", False))
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)

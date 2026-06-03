@@ -390,6 +390,9 @@ def _run_wallets(cfg, args, keys):
     if not wallets:
         print(C.err("В wallets.xlsx нет кошельков (A — приватник, B — адрес депозита Bitget)."))
         return
+    if getattr(cfg, "randomize_wallets", False) and len(wallets) > 1:
+        random.shuffle(wallets)
+        print(C.dim("  🔀 Порядок кошельков: случайный (этот запуск)"))
     print(C.header(f"\n▶ ЗАПУСК: {len(wallets)} аккаунт(ов) | стадии: "
                    + " → ".join(str(CYCLE_ORDER.index(k) + 1) for k in keys)))
     # Перед стартом: свести остатки с субаккаунтов Bitget на мейн (вдруг застряли с прошлого прогона).
@@ -527,6 +530,8 @@ def menu_loop(cfg, args):
         print("  Модули (цифра — включить/выключить, сохраняется сразу):")
         for i, k in enumerate(CYCLE_ORDER, 1):
             print(f"    {i}) {badge(k)}  {names.get(k, STAGES[k][0])}")
+        rnd = "[✓ ВКЛ ]" if getattr(cfg, "randomize_wallets", False) else "[✗ выкл]"
+        print(f"    r) {rnd}  Случайный порядок кошельков")
         print(f"    s) ▶ ЗАПУСТИТЬ по wallets.xlsx:  {cyc_str}")
         print("    0) Выход")
         choice = input("  Выбор: ").strip().lower()
@@ -539,11 +544,15 @@ def menu_loop(cfg, args):
             cfg.enabled[key] = not cfg.enabled.get(key, True)
             _persist(cfg)
             continue
+        if choice == "r":                              # вкл/выкл случайный порядок
+            cfg.randomize_wallets = not getattr(cfg, "randomize_wallets", False)
+            _persist(cfg)
+            continue
         if choice in ("s", "go", "run", "запуск", "старт"):
             _do_run(cfg, args)
             input("\n  Enter — вернуться в меню… ")
             continue
-        print("  Не понял. Цифры 1-5 — вкл/выкл, s — запуск, 0 — выход.")
+        print("  Не понял. Цифры 1-5 — вкл/выкл, r — случайный порядок, s — запуск, 0 — выход.")
 
 
 # --------------------------------------------------------------------------- #

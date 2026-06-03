@@ -107,6 +107,12 @@ def _rows(cfg):
         name = MOD_NAME[k]
         rows.append((f"mod:{k}", f"{box_c} {name}", f"{box_p} {name}"))
 
+    rnd = getattr(cfg, "randomize_wallets", False)
+    rbox_c = f"{GREEN}[✓]{RESET}" if rnd else f"{GREY}[ ]{RESET}"
+    rbox_p = "[✓]" if rnd else "[ ]"
+    rname = "Случайный порядок кошельков"
+    rows.append(("opt:randomize", f"{rbox_c} {CYAN}{rname}{RESET}", f"{rbox_p} {rname}"))
+
     cyc = _cycle_str(cfg)
     rows.append(("run", f"    {GREEN}{BOLD}▶ ЗАПУСТИТЬ по wallets.xlsx{RESET}  ({cyc})",
                  f"    ▶ ЗАПУСТИТЬ по wallets.xlsx  ({cyc})"))
@@ -164,6 +170,9 @@ def run_menu(cfg, args, do_run, persist):
                 if kind.startswith("mod:"):
                     k = kind[4:]
                     cfg.enabled[k] = not cfg.enabled.get(k, True)
+                    persist(cfg)
+                elif kind == "opt:randomize":
+                    cfg.randomize_wallets = not getattr(cfg, "randomize_wallets", False)
                     persist(cfg)
                 elif kind == "run":
                     _exit_fullscreen()          # вывод прогона — на основном экране (останется в истории)
