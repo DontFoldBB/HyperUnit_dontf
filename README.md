@@ -33,6 +33,8 @@ python -m venv .venv
 ```
 This creates a local `.venv` — `ЗАПУСТИТЬ.bat` will find it automatically.
 
+A venv is **optional**: you can instead run `pip install -r requirements.txt` with your system Python and launch directly — `ЗАПУСТИТЬ.bat` falls back to the system `python`. The venv just keeps these dependencies isolated from other projects.
+
 ### Step 2. Bitget keys — file `config\.env`
 Copy **`config\.env.example`** → **`config\.env`**, then open `config\.env` in a text editor and fill in your keys (no quotes, no spaces around `=`):
 ```
@@ -90,12 +92,13 @@ Copy **`config\config.example.json`** → **`config\config.json`**, then open it
 
 An arrow-key menu opens (the in-app menu is in Russian):
 ```
-  wallets from wallets.xlsx
+  wallets from wallets.xlsx: 5
   ► [✓] Withdraw ETH from Bitget
     [✓] Deposit to Hyperliquid (Unit)
     [✓] Trade / build volume
     [✓] Withdraw ETH from Hyperliquid (Unit)
     [✓] Return ETH to Bitget
+    [✓] Shuffle wallet order
         ▶ RUN over wallets.xlsx
         Exit
 ```
