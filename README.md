@@ -23,6 +23,8 @@ For each wallet in your list the script runs the full loop and builds volume on 
 
 ## Setup — step by step
 
+> The `config\` folder ships with **`*.example`** templates. For each one, make a copy **without** `.example` and fill it in — your real `config\.env`, `config\config.json`, `config\wallets.xlsx` stay on your machine (git ignores them, so your keys are never committed).
+
 ### Step 1. Install dependencies
 Open a terminal (PowerShell) **in the project folder** and run:
 ```powershell
@@ -32,7 +34,7 @@ python -m venv .venv
 This creates a local `.venv` — `ЗАПУСТИТЬ.bat` will find it automatically.
 
 ### Step 2. Bitget keys — file `config\.env`
-The **`config\.env`** file is already in the folder — open it in a text editor and fill in your keys (no quotes, no spaces around `=`):
+Copy **`config\.env.example`** → **`config\.env`**, then open `config\.env` in a text editor and fill in your keys (no quotes, no spaces around `=`):
 ```
 BITGET_API_KEY=your_key
 BITGET_API_SECRET=your_secret
@@ -41,13 +43,13 @@ ETH_RPC_URL=            ← can be left empty (public nodes will be used)
 ```
 
 ### Step 3. Wallets — file `config\wallets.xlsx`
-Open **`config\wallets.xlsx`** in Excel and fill in:
+Copy **`config\wallets.example.xlsx`** → **`config\wallets.xlsx`**, then open it in Excel and fill in:
 - **column A** — wallet private key (`0x...`);
 - **column B** — the ETH deposit address on Bitget (where funds return at the end of the loop).
 - **One row = one account.** As many rows as accounts to run, one after another. The header row can stay — it's skipped.
 
 ### Step 4. Parameters — file `config\config.json` (the most important)
-Open **`config\config.json`** and tune it — this is where you set **what and how much to do**. Every line is documented inside the file; `//` and `#` comments are allowed.
+Copy **`config\config.example.json`** → **`config\config.json`**, then open it and tune — this is where you set **what and how much to do**. Every line is documented inside the file; `//` and `#` comments are allowed.
 
 **Ranges.** Many numbers can be given as a “range” — the value is picked randomly (a separate one per wallet/trade) so amounts aren't round: `"90-95"` = random between 90 and 95; a plain number (`90`) = fixed.
 
@@ -75,6 +77,7 @@ Open **`config\config.json`** and tune it — this is where you set **what and h
 
 **The rest:**
 - `modules` (top of the file) — which of the 5 steps are enabled (`true/false`); can also be toggled in the menu at launch;
+- `randomize_wallets` — `true` shuffles the wallet order on each run (`false` = order from the file); can also be toggled in the menu;
 - `advanced` — wait timeouts and pauses between steps/wallets.
 
 ---
@@ -121,5 +124,5 @@ The **`output\`** folder (created automatically):
 
 ## What's in the folder (for reference)
 
-- `config\` — settings (`.env`, `config.json`, `wallets.xlsx`) — fill them in right here. They're empty in the repository; your filled-in values don't go to git.
+- `config\` — settings. The repo ships **`*.example`** templates; copy each without `.example` and fill it in. Your real `.env` / `config.json` / `wallets.xlsx` stay local (git-ignored).
 - `app\` — launch code and menu; `lib\` — operation modules (Bitget / Unit / Hyperliquid); `output\` — reports.
