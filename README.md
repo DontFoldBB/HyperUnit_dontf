@@ -82,7 +82,7 @@ Copy **`config\config.example.json`** → **`config\config.json`**, then open it
 **The rest:**
 - `modules` (top of the file) — which of the 5 steps are enabled (`true/false`); can also be toggled in the menu at launch;
 - `randomize_wallets` — `true` shuffles the wallet order on each run (`false` = order from the file); can also be toggled in the menu;
-- `builder_codes` / `builder_address` / `builder_fee` — optional **builder fee**: with `builder_codes: true`, every Hyperliquid order pays a small fee (`builder_fee`, e.g. `0.01%`; max 0.1% on perps) to `builder_address`. **Off by default.** The builder address must hold ≥100 USDC in perps (standard mode) to receive fees;
+- `builder_codes` — optional **builder fee** (off by default): with `true`, each Hyperliquid order pays a small fixed fee (~0.01%) to the project's builder address. Only the on/off toggle lives in the config — the address and rate are fixed in the code;
 - `advanced` — wait timeouts and pauses between steps/wallets.
 
 ---

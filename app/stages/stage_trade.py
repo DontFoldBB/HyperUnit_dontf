@@ -49,10 +49,8 @@ def run(cfg, live):
         reserve_usdc=float(t.get("reserve_usdc", 1.0)),
         random_pick=True,                       # HIP-3 — случайный актив из пула, а не обход списка
         size_jitter=float(t.get("size_jitter", 0.35)),  # размеры позиций разные (±%)
-        # builder-комиссия (монетизация): включается тумблером в config; выкл -> ордера как раньше
+        # builder-комиссия (монетизация): тумблер в config; адрес/ставка вшиты в circle.py. выкл -> ордера как раньше
         builder_enabled=bool(getattr(cfg, "builder", {}).get("enabled")),
-        builder_address=getattr(cfg, "builder", {}).get("address", ""),
-        builder_fee=getattr(cfg, "builder", {}).get("fee", "0.01%"),
     )
 
     summary = (f"UETH {res.get('ueth_before')} → {res.get('ueth_after')} | "
