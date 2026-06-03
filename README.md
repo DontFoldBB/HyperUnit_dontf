@@ -14,8 +14,8 @@ For each wallet in your list the script runs the full loop and builds volume on 
 
 ## What you need first
 
-- **Windows** and **Python 3.10+**. When installing Python, tick *“Add Python to PATH”*.
-  Check: open a terminal (PowerShell) and run `python --version` — it should print a version.
+- **Windows, Linux or macOS** and **Python 3.10+**. On Windows, when installing Python tick *“Add Python to PATH”*.
+  Check: open a terminal and run `python --version` (on Linux/macOS — `python3 --version`).
 - A **Bitget account** with an API key: **Spot** + **Withdraw** permissions, and your IP added to the key's **whitelist**.
 - **Private keys** of your wallets.
 
@@ -106,6 +106,17 @@ An arrow-key menu opens (the in-app menu is in Russian):
 - **Enter / Space** — toggle a module or press “Run”.
 - **q** — exit. Checkboxes are saved automatically.
 - “Run” executes the enabled steps **over all wallets** from `wallets.xlsx`, one by one.
+
+### Linux / macOS
+`ЗАПУСТИТЬ.bat` is Windows-only. On Linux/macOS set up and run with Python directly (file paths use `/` instead of `\`):
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python app/main.py            # menu — arrow keys work here too
+# or without the menu (handy on a server):
+.venv/bin/python app/main.py --stage cycle
+```
+Over SSH the arrow-key menu works; in a non-interactive/piped run it automatically falls back to the text menu.
 
 ---
 

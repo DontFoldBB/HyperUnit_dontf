@@ -14,8 +14,8 @@
 
 ## Что нужно заранее
 
-- **Windows** и **Python 3.10+**. При установке Python поставь галочку *«Add Python to PATH»*.
-  Проверка: открой терминал (PowerShell) и набери `python --version` — должна показаться версия.
+- **Windows, Linux или macOS** и **Python 3.10+**. На Windows при установке Python поставь галочку *«Add Python to PATH»*.
+  Проверка: открой терминал и набери `python --version` (на Linux/macOS — `python3 --version`).
 - **Аккаунт Bitget** с API-ключом: права **Spot** + **Withdraw**, и твой IP добавлен в **whitelist** ключа.
 - **Приватные ключи** кошельков.
 
@@ -107,6 +107,17 @@ ETH_RPC_URL=            ← можно оставить пустым (будут
 - **Enter / Пробел** — включить/выключить модуль или нажать «Запустить».
 - **q** — выход. Галочки сохраняются автоматически.
 - «Запустить» прогонит включённые шаги **по всем кошелькам** из `wallets.xlsx`, по очереди.
+
+### Linux / macOS
+`ЗАПУСТИТЬ.bat` — только для Windows. На Linux/macOS поставь и запускай Python напрямую (пути с `/` вместо `\`):
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python app/main.py            # меню — стрелки тут тоже работают
+# или без меню (удобно на сервере):
+.venv/bin/python app/main.py --stage cycle
+```
+По SSH стрелочное меню работает; при неинтерактивном запуске (пайп) само переключается на текстовое.
 
 ---
 
