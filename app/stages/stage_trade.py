@@ -26,12 +26,12 @@ def run(cfg, live):
 
     print(C.step("\n=== [3] Торговля на Hyperliquid ==="))
     single_lbl = ", ".join(single) if isinstance(single, (list, tuple)) else (single or "")
-    print(f"  HIP-3: {hip3 or '—'} | перп: {perp}"
+    print(f"  HIP-3: {hip3 or '—'} | perp: {perp}"
           + (f" ({single_lbl})" if perp == "single" and single_lbl else "")
           + f" | маржа {t['pct']}% | плечо {t['leverage']}x")
     if (t.get("target_hip3") or 0) or (t.get("target_perp") or 0):
         print(f"  Цель объёма (на этот кошелёк): HIP-3 ${t.get('target_hip3') or 0} | "
-              f"перпы ${t.get('target_perp') or 0}")
+              f"perps ${t.get('target_perp') or 0}")
 
     res = circle.run_circle(
         private_key=cfg.private_key,
@@ -55,7 +55,7 @@ def run(cfg, live):
 
     summary = (f"UETH {res.get('ueth_before')} → {res.get('ueth_after')} | "
                f"объём всего ${res.get('volume_total')} "
-               f"(HIP-3 ${res.get('volume_hip3')}, перпы ${res.get('volume_perp')}, "
+               f"(HIP-3 ${res.get('volume_hip3')}, perps ${res.get('volume_perp')}, "
                f"спот ${res.get('volume_spot')}) | открытых позиций: {res.get('positions_left')}")
     return {
         "stage": "trade",

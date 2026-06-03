@@ -429,9 +429,9 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
     if hip3_assets:
         print(f"    HIP-3:  {fmt(per_margin_hip)} маржи на позицию")
     if perp_kind == "pair":
-        print(f"    Перпы:  {fmt(per_margin_perp)} × 2 ноги = {fmt(per_margin_perp * 2)} маржи (та же сумма, поделена)")
+        print(f"    Perps:  {fmt(per_margin_perp)} × 2 ноги = {fmt(per_margin_perp * 2)} маржи (та же сумма, поделена)")
     elif perp_kind:
-        print(f"    Перпы:  {fmt(per_margin_perp)} маржи на позицию")
+        print(f"    Perps:  {fmt(per_margin_perp)} маржи на позицию")
 
     # Если маржа × плечо не дотягивает до минимального ордера (~$10) — на этой площадке
     # ничего не открыть; фазу пропускаем (не крутим вхолостую).
@@ -441,7 +441,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
         print(_paint(f"  ⚠ HIP-3 пропускаю: {fmt(per_margin_hip)} × {lev} = {fmt(per_margin_hip*lev)} "
                      f"< мин. ордера {fmt(MIN_ORDER)}.", "yellow"))
     if perp_kind and not perp_ok:
-        print(_paint(f"  ⚠ Перпы пропускаю: {fmt(per_margin_perp)} × {lev} = {fmt(per_margin_perp*lev)} "
+        print(_paint(f"  ⚠ Perps пропускаю: {fmt(per_margin_perp)} × {lev} = {fmt(per_margin_perp*lev)} "
                      f"< мин. ордера {fmt(MIN_ORDER)}.", "yellow"))
     if (hip3_assets or perp_kind) and not hip_ok and not perp_ok:
         print(_paint("     Бюджет мал. Нужно: пополнить счёт, поднять плечо, убрать одну "
@@ -507,7 +507,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
         perp_pool = list(perp_arg) if (perp_kind == "single" and isinstance(perp_arg, (list, tuple))) else None
         plabel = (f"{perp_arg[0]}+{perp_arg[1]}" if perp_kind == "pair"
                   else (", ".join(perp_pool) if perp_pool else str(perp_arg)))
-        print(_paint(f"\n  ▸ Перпы ({'один проход' if one_pass_perp else 'цель '+fmt(target_perp)}): {plabel}"
+        print(_paint(f"\n  ▸ Perps ({'один проход' if one_pass_perp else 'цель '+fmt(target_perp)}): {plabel}"
                      + ("  [случайный из пула]" if perp_pool and len(perp_pool) > 1 else ""), "cyan", "bold"))
         empty = 0
         while True:
@@ -516,7 +516,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
             else:
                 coin = random.choice(perp_pool) if perp_pool else perp_arg
                 label = coin
-            print(_paint(f"\n   ~~ {label}  (перпы: {fmt(vol_perp)}"
+            print(_paint(f"\n   ~~ {label}  (perps: {fmt(vol_perp)}"
                          f"{'' if one_pass_perp else '/'+fmt(target_perp)}) ~~", "cyan"))
             before = vol_perp
             if perp_kind == "pair":
@@ -526,7 +526,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
             trades += 1
             empty = 0 if vol_perp > before else empty + 1
             if empty >= MAX_EMPTY:
-                print(_paint("    ⚠ подряд ничего не открылось (мало средств / нет цены) — стоп перпы", "yellow"))
+                print(_paint("    ⚠ подряд ничего не открылось (мало средств / нет цены) — стоп perps", "yellow"))
                 break
             if one_pass_perp or vol_perp >= target_perp or trades >= MAX_TRADES or not live:
                 break
@@ -583,7 +583,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
     if not live and (target_hip3 > 0 or target_perp > 0):
         print("    [ТЕСТ] показан один проход; в реале фазы крутятся до своих целей")
     print(f"    объём HIP-3:  {fmt(vol_hip3)}" + (f" / цель {fmt(target_hip3)}" if target_hip3 > 0 else ""))
-    print(f"    объём перпы:  {fmt(vol_perp)}" + (f" / цель {fmt(target_perp)}" if target_perp > 0 else ""))
+    print(f"    объём perps:  {fmt(vol_perp)}" + (f" / цель {fmt(target_perp)}" if target_perp > 0 else ""))
     print(f"    объём спот:   {fmt(vol_spot)}")
     print(f"    объём ВСЕГО:  {fmt(vol_hip3 + vol_perp + vol_spot)}")
     print(f"    сделок (открытий+закрытий): {trades}")

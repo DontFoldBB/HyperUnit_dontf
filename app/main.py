@@ -179,7 +179,7 @@ def _totals(results, price):
 
 
 def _volumes(results, price):
-    """Объёмы по площадкам в $: Unit (депозит+вывод), HIP-3, перпы, спот."""
+    """Объёмы по площадкам в $: Unit (депозит+вывод), HIP-3, perps, спот."""
     bs = {r.get("stage"): r for r in results}
     d, w, t = _raw(bs, "deposit"), _raw(bs, "withdraw"), _raw(bs, "trade")
     unit = (_eth_usd(d.get("amount_eth"), price) or Decimal(0)) \
@@ -209,7 +209,7 @@ def print_spent_report(results, price=None):
     print("  " + C.bold("ОБЪЁМЫ:"))
     print(f"    Unit (деп+вывод):  {C.money('$' + format(v['unit'], '.2f'))}")
     print(f"    HIP-3:             {C.money('$' + format(v['hip3'], '.2f'))}")
-    print(f"    Перпы:             {C.money('$' + format(v['perp'], '.2f'))}")
+    print(f"    Perps:             {C.money('$' + format(v['perp'], '.2f'))}")
     print(f"    Спот (UETH):       {C.money('$' + format(v['spot'], '.2f'))}")
     note = "" if price else C.warn("  (ETH в $ не переведён — нет цены)")
     print("  " + C.bold("КОМИССИИ ВСЕГО:") + "  " + C.money("~$" + format(fees, ".2f")) + note)
@@ -264,7 +264,7 @@ def save_run_report(cfg, results, live, price=None):
             fh.write("  ОБЪЁМЫ:\n")
             fh.write(f"    Unit (деп+вывод):  ${v['unit']:.2f}\n")
             fh.write(f"    HIP-3:             ${v['hip3']:.2f}\n")
-            fh.write(f"    Перпы:             ${v['perp']:.2f}\n")
+            fh.write(f"    Perps:             ${v['perp']:.2f}\n")
             fh.write(f"    Спот (UETH):       ${v['spot']:.2f}\n")
             fh.write(f"  КОМИССИИ ВСЕГО:  ~${fees:.2f}\n")
     except Exception as e:
@@ -468,7 +468,7 @@ def print_accounts_summary(accounts):
     for r in rows:
         s = r["address"][:8] + "…" + r["address"][-4:]
         v = r["v"]
-        vols = f"Unit ${v['unit']:.0f} · HIP-3 ${v['hip3']:.0f} · перпы ${v['perp']:.0f}"
+        vols = f"Unit ${v['unit']:.0f} · HIP-3 ${v['hip3']:.0f} · perps ${v['perp']:.0f}"
         print(f"  {C.bold(s)}  {vols}  |  " + C.money("~$" + format(r["fees"], ".2f")))
     print(C.dim("─" * 64))
     print("  " + C.bold("ОБЩИЕ ТРАТЫ (комиссии) по всем:") + "  " + C.money("~$" + format(total_fees, ".2f")))
@@ -487,7 +487,7 @@ def _save_accounts_summary(rows, total_fees):
                 v = r["v"]
                 fh.write(f"  {r['address']}\n")
                 fh.write(f"      объёмы: Unit ${v['unit']:.2f}  HIP-3 ${v['hip3']:.2f}  "
-                         f"перпы ${v['perp']:.2f}  спот ${v['spot']:.2f}   |   "
+                         f"perps ${v['perp']:.2f}  спот ${v['spot']:.2f}   |   "
                          f"комиссии ~${r['fees']:.2f}\n")
             fh.write("─" * 70 + "\n")
             fh.write(f"  ОБЩИЕ ТРАТЫ (комиссии) по всем: ~${total_fees:.2f}\n")
