@@ -13,6 +13,8 @@
 import os
 import sys
 
+import wallets_xlsx
+
 # --- ANSI-цвета ---
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -127,7 +129,9 @@ def _render(cfg, rows, cursor):
     print(f"{CYAN}{BOLD}   Bitget → Unit → Hyperliquid → вывод{RESET}")
     print(f"{CYAN}{BOLD}{bar}{RESET}")
     print(f"  {MAGENTA}TG-канал: https://t.me/thatcryptofriend{RESET}")
-    print(f"  кошельки из {WHITE}wallets.xlsx{RESET}")
+    n = wallets_xlsx.count_wallets(getattr(cfg, "wallets_file", "") or None)
+    cnt = f"{GREEN}{n}{RESET}" if n else f"{RED}0 — заполни файл{RESET}"
+    print(f"  кошельки из {WHITE}wallets.xlsx{RESET}: {cnt}")
     rpc = "свой (.env)" if cfg.eth_rpc_url else "публичный"
     bg = f"{GREEN}есть{RESET}" if all(cfg.bitget.values()) else f"{RED}нет{RESET}"
     print(f"  RPC: {rpc}    ключи Bitget: {bg}")

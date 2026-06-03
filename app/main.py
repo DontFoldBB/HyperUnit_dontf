@@ -358,7 +358,8 @@ def print_header(cfg):
     print(C.header("  HyperUnit  ·  Bitget → Unit → Hyperliquid → Bitget"))
     print(C.header("=" * 64))
     print(C.paint("  TG-канал: https://t.me/thatcryptofriend", "magenta"))
-    print(f"  Кошельки: {C.bold('wallets.xlsx')} (1 строка = 1 аккаунт)")
+    wn = wallets_xlsx.count_wallets(cfg.wallets_file or None)
+    print(f"  Кошельки: {C.bold('wallets.xlsx')} — {wn} шт. (1 строка = 1 аккаунт)")
     rpc = "свой (из .env)" if cfg.eth_rpc_url else "публичный по умолчанию"
     bg = "заданы" if all(cfg.bitget.values()) else "НЕ заданы (нужны для Bitget)"
     print(f"  ETH RPC:  {rpc}   |   ключи Bitget: {bg}")

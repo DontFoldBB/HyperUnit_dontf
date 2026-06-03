@@ -46,3 +46,25 @@ def read_wallets(path=None):
         out.append({"private_key": pk, "bitget_address": addr})
     wb.close()
     return out
+
+
+_count_cache = {}  # path -> (mtime, count): чтобы меню не перечитывало файл на каждый кадр
+
+
+def count_wallets(path=None):
+    """Сколько кошельков (строк с приватником) в файле. 0 — если файла нет/ошибка.
+    Кэшируется по времени правки файла, поэтому частые вызовы из меню дёшевы."""
+    path = path or DEFAULT_FILE
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return 0
+    cached = _count_cache.get(path)
+    if cached and cached[0] == mtime:
+        return cached[1]
+    try:
+        n = len(read_wallets(path))
+    except Exception:
+        return cached[1] if cached else 0
+    _count_cache[path] = (mtime, n)
+    return n
