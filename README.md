@@ -48,6 +48,8 @@ Copy **`config\wallets.example.xlsx`** → **`config\wallets.xlsx`**, then open 
 - **column B** — the ETH deposit address on Bitget (where funds return at the end of the loop).
 - **One row = one account.** As many rows as accounts to run, one after another. The header row can stay — it's skipped.
 
+> ⚠️ **Don't forget to add every wallet address to the *withdrawal whitelist* on Bitget** — step 1 withdraws ETH from Bitget to these addresses, so without whitelisting the withdrawal will fail.
+
 ### Step 4. Parameters — file `config\config.json` (the most important)
 Copy **`config\config.example.json`** → **`config\config.json`**, then open it and tune — this is where you set **what and how much to do**. Every line is documented inside the file; `//` and `#` comments are allowed.
 
