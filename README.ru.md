@@ -113,9 +113,9 @@ ETH_RPC_URL=            ← можно оставить пустым (будут
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python app/main.py            # меню — стрелки тут тоже работают
+.venv/bin/python run.py            # меню — стрелки тут тоже работают
 # или без меню (удобно на сервере):
-.venv/bin/python app/main.py --stage cycle
+.venv/bin/python run.py --stage cycle
 ```
 По SSH стрелочное меню работает; при неинтерактивном запуске (пайп) само переключается на текстовое.
 

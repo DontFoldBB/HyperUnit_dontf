@@ -112,9 +112,9 @@ An arrow-key menu opens (the in-app menu is in Russian):
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python app/main.py            # menu — arrow keys work here too
+.venv/bin/python run.py            # menu — arrow keys work here too
 # or without the menu (handy on a server):
-.venv/bin/python app/main.py --stage cycle
+.venv/bin/python run.py --stage cycle
 ```
 Over SSH the arrow-key menu works; in a non-interactive/piped run it automatically falls back to the text menu.
 
