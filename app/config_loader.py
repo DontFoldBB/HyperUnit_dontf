@@ -148,9 +148,9 @@ class Config:
         self.private_key = (env.get("PRIVATE_KEY") or os.environ.get("PRIVATE_KEY") or "").strip()
         self.eth_rpc_url = (env.get("ETH_RPC_URL") or os.environ.get("ETH_RPC_URL") or "").strip()
         self.bitget = {
-            "api_key": (env.get("BITGET_API_KEY") or "").strip(),
-            "api_secret": (env.get("BITGET_API_SECRET") or "").strip(),
-            "api_passphrase": (env.get("BITGET_API_PASSPHRASE") or "").strip(),
+            "api_key": (env.get("BITGET_API_KEY") or os.environ.get("BITGET_API_KEY") or "").strip(),
+            "api_secret": (env.get("BITGET_API_SECRET") or os.environ.get("BITGET_API_SECRET") or "").strip(),
+            "api_passphrase": (env.get("BITGET_API_PASSPHRASE") or os.environ.get("BITGET_API_PASSPHRASE") or "").strip(),
         }
 
         # --- режим ---

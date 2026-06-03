@@ -90,7 +90,10 @@ def run(cfg, live):
     print(f"  RPC: {rpc}" + ("" if cfg.eth_rpc_url else " (публичный)"))
     chain_id = w3.eth.chain_id
     if chain_id != 1:
-        print(f"  ⚠ chainId={chain_id} — это не Ethereum mainnet (Unit работает с mainnet=1).")
+        return {"stage": "deposit", "ok": False,
+                "summary": f"RPC не Ethereum mainnet (chainId={chain_id}, нужен 1) — "
+                           f"депозит через Unit идёт только в mainnet. Проверь ETH_RPC_URL в .env.",
+                "spent": {}, "raw": {}}
 
     acct = w3.eth.account.from_key(key)
     sender = acct.address               # он же HL-аккаунт назначения

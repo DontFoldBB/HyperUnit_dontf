@@ -45,6 +45,13 @@ def run(cfg, live):
                 "spent": {}, "raw": {}}
     print(f"  RPC: {rpc}" + ("" if cfg.eth_rpc_url else " (публичный)"))
 
+    chain_id = w3.eth.chain_id
+    if chain_id != 1:
+        return {"stage": "bitget_return", "ok": False,
+                "summary": f"RPC не Ethereum mainnet (chainId={chain_id}, нужен 1) — "
+                           f"возврат на Bitget идёт только в mainnet. Проверь ETH_RPC_URL в .env.",
+                "spent": {}, "raw": {}}
+
     sender = w3.eth.account.from_key(cfg.private_key).address
 
     dest, src = _bitget_deposit_address(cfg)

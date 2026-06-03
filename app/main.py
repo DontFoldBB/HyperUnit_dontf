@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-HyperUnit: Bitget → Unit-депозит → торговля Hyperliquid → Unit-вывод.
+HyperUnit: Bitget → Unit-депозит → торговля Hyperliquid → Unit-вывод → возврат на Bitget.
 
-Один кошелёк (PRIVATE_KEY) на все стадии. Все параметры — в config.json,
-секреты — в .env. Запусти и выбери стадию в меню (или прогон всего цикла).
+Прогон идёт по ВСЕМ кошелькам из config/wallets.xlsx (1 строка = 1 аккаунт).
+Параметры — в config/config.json, ключи Bitget — в config/.env.
+Запуск ВСЕГДА реальный (тест-режима нет).
 
 Запуск:
-    python main.py                 # меню
-    python main.py --stage 5 --yes # весь цикл без вопросов (режим из config.mode.live)
-    python main.py --stage trade --live
-    python main.py --stage 1 --test
+    python app/main.py                # меню: выбрать модули и «Запустить»
+    python app/main.py --stage cycle  # весь цикл по всем кошелькам, без меню
+    python app/main.py --stage 1      # только стадию 1 по всем кошелькам
+    python app/main.py --stage trade  # стадию можно и по имени
 
-Стадии: 1=bitget  2=deposit  3=trade  4=withdraw  5/cycle=весь цикл подряд.
+Стадии: 1=bitget  2=deposit  3=trade  4=withdraw  5=bitget_return  |  cycle=весь цикл.
 """
 
 import os
