@@ -598,6 +598,8 @@ def menu_loop(cfg, args):
             print(f"    {i}) {badge(k)}  {names.get(k, STAGES[k][0])}")
         rnd = "[✓ ВКЛ ]" if getattr(cfg, "randomize_wallets", False) else "[✗ выкл]"
         print(f"    r) {rnd}  Случайный порядок кошельков")
+        skp = "[✓ ВКЛ ]" if getattr(cfg, "skip_done_accounts", True) else "[✗ выкл]"
+        print(f"    d) {skp}  Пропускать прогнанные (резюме)")
         print(f"    s) ▶ ЗАПУСТИТЬ по wallets.xlsx:  {cyc_str}")
         print("    0) Выход")
         choice = input("  Выбор: ").strip().lower()
@@ -614,11 +616,15 @@ def menu_loop(cfg, args):
             cfg.randomize_wallets = not getattr(cfg, "randomize_wallets", False)
             _persist(cfg)
             continue
+        if choice == "d":                              # вкл/выкл пропуск прогнанных (резюме)
+            cfg.skip_done_accounts = not getattr(cfg, "skip_done_accounts", True)
+            _persist(cfg)
+            continue
         if choice in ("s", "go", "run", "запуск", "старт"):
             _do_run(cfg, args)
             input("\n  Enter — вернуться в меню… ")
             continue
-        print("  Не понял. Цифры 1-5 — вкл/выкл, r — случайный порядок, s — запуск, 0 — выход.")
+        print("  Не понял. Цифры 1-5 — вкл/выкл, r — случайный порядок, d — пропуск прогнанных, s — запуск, 0 — выход.")
 
 
 # --------------------------------------------------------------------------- #

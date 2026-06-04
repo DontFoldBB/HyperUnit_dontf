@@ -330,5 +330,7 @@ def save_toggles(cfg, path=CONFIG_PATH):
         text = _set_module_bool(text, key, cfg.enabled.get(key, True))
     text = _set_or_add_top_bool(text, "randomize_wallets",
                                 getattr(cfg, "randomize_wallets", False))
+    text = _set_or_add_top_bool(text, "skip_done_accounts",
+                                getattr(cfg, "skip_done_accounts", True))
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)

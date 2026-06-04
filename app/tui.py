@@ -155,6 +155,12 @@ def _rows(cfg):
     rname = "Случайный порядок кошельков"
     rows.append(("opt:randomize", f"{rbox_c} {CYAN}{rname}{RESET}", f"{rbox_p} {rname}"))
 
+    skp = getattr(cfg, "skip_done_accounts", True)
+    sbox_c = f"{GREEN}[✓]{RESET}" if skp else f"{GREY}[ ]{RESET}"
+    sbox_p = "[✓]" if skp else "[ ]"
+    sname = "Пропускать прогнанные (резюме)"
+    rows.append(("opt:skipdone", f"{sbox_c} {CYAN}{sname}{RESET}", f"{sbox_p} {sname}"))
+
     cyc = _cycle_str(cfg)
     rows.append(("run", f"    {GREEN}{BOLD}▶ ЗАПУСТИТЬ по wallets.xlsx{RESET}  ({cyc})",
                  f"    ▶ ЗАПУСТИТЬ по wallets.xlsx  ({cyc})"))
@@ -217,6 +223,9 @@ def run_menu(cfg, args, do_run, persist):
                     persist(cfg)
                 elif kind == "opt:randomize":
                     cfg.randomize_wallets = not getattr(cfg, "randomize_wallets", False)
+                    persist(cfg)
+                elif kind == "opt:skipdone":
+                    cfg.skip_done_accounts = not getattr(cfg, "skip_done_accounts", True)
                     persist(cfg)
                 elif kind == "run":
                     _exit_fullscreen()          # вывод прогона — на основном экране (останется в истории)
