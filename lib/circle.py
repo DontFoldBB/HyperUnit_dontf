@@ -624,6 +624,44 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
 # ===================================================================== #
 #  ПУБЛИЧНЫЙ API для интеграции (вызов из другого скрипта/агента)
 # ===================================================================== #
+def _harden_retries(ex, tries=4, backoff=0.7):
+    """Ретраи на обрывах прокси/сети для ВСЕХ вызовов SDK (ex и ex.info идут через API.post).
+
+    Прокси периодически рвёт соединение (ProxyError/'Remote end closed connection') — без
+    повтора падает плечо/ордер и дальше каскадом 'Insufficient margin'. Оборачиваем .post:
+      • /exchange (плечо, ордера, переводы) — повтор ТОЛЬКО при ошибке соединения
+        (ConnectionError/ProxyError): запрос не дошёл до сервера, повтор безопасен (без дублей).
+        ReadTimeout (ответ мог уйти) НЕ повторяем — чтобы не сдублировать ордер.
+      • /info (чтение) — повтор при любой сетевой ошибке (идемпотентно).
+    Бизнес-ошибки (HTTP 200 + {'status':'err'}) не трогаем — это не сетевой сбой.
+    """
+    import requests as _rq
+
+    def _wrap(api_obj):
+        if api_obj is None or getattr(api_obj, "_retry_wrapped", False):
+            return
+        _orig = api_obj.post
+
+        def _post_retry(url_path, payload=None):
+            is_exchange = "exchange" in str(url_path)
+            exc = _rq.exceptions.ConnectionError if is_exchange else _rq.exceptions.RequestException
+            last = None
+            for i in range(tries):
+                try:
+                    return _orig(url_path, payload)
+                except exc as e:
+                    last = e
+                    if i < tries - 1:
+                        time.sleep(backoff * (2 ** i))
+            raise last
+
+        api_obj.post = _post_retry
+        api_obj._retry_wrapped = True
+
+    _wrap(ex)
+    _wrap(getattr(ex, "info", None))
+
+
 def setup_account(private_key: str, account_address: str = None,
                   base_url: str = constants.MAINNET_API_URL):
     """Создаёт подключение. Возвращает (ex, info, addr, spot_coin, spot_szdec, specs)."""
@@ -631,6 +669,7 @@ def setup_account(private_key: str, account_address: str = None,
     addr = account_address or wallet.address
     ex = Exchange(wallet, base_url, account_address=addr, perp_dexs=["", DEX])
     info = ex.info
+    _harden_retries(ex)              # ретраи на обрывах прокси/сети для всех вызовов SDK
     spot_coin, spot_szdec = resolve_spot_coin(info, ETH_TOKEN)
     specs = {}
     for dx in ("", DEX):
@@ -795,6 +834,7 @@ def main() -> int:
     print("\nПодключаюсь к Hyperliquid...")
     ex = Exchange(wallet, constants.MAINNET_API_URL, account_address=addr, perp_dexs=["", DEX])
     info = ex.info
+    _harden_retries(ex)              # ретраи на обрывах прокси/сети для всех вызовов SDK
     try:
         spot_coin, spot_szdec = resolve_spot_coin(info, ETH_TOKEN)
         specs = {}
