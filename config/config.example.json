@@ -21,8 +21,9 @@
   // Порядок прохода по кошелькам из wallets.xlsx (можно переключить и в меню):
   "randomize_wallets": false,   // false = по порядку строк; true = перемешать на каждом запуске
 
-  // Пропускать уже сделанные аккаунты (их адреса пишутся в output/done_accounts.txt) — чтобы продолжить после обрыва:
-  "skip_done_accounts": true,    // true = пропускать уже сделанные; удали output/done_accounts.txt, чтобы пройти всех заново
+  // Пропускать аккаунты, где ВСЕ стадии прошли (пишутся в output/done_accounts.txt) — резюме после обрыва.
+  // Упавшие → output/failed_accounts.txt и повтор на следующем запуске. Удали done_accounts.txt, чтобы прогнать всех заново.
+  "skip_done_accounts": true,    // true = пропускать успешно сделанные
 
   // Builder-комиссия Hyperliquid: маленький % с каждого ордера. Адрес и ставка вшиты в код — здесь только вкл/выкл.
   "builder_codes": true,         // true = включить builder-комиссию

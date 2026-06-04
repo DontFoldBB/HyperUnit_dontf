@@ -233,9 +233,10 @@ RUN_COLUMNS = [
 
 
 # --------------------------------------------------------------------------- #
-#  Прогресс: какие аккаунты уже прогнаны (чтобы продолжить после обрыва)        #
+#  Прогресс: done (все стадии прошли) / failed (упал) — резюме + авто-ретрай     #
 # --------------------------------------------------------------------------- #
 DONE_FILE = os.path.join(paths.OUTPUT_DIR, "done_accounts.txt")
+FAILED_FILE = os.path.join(paths.OUTPUT_DIR, "failed_accounts.txt")
 
 
 def _addr_of(private_key):
@@ -279,6 +280,24 @@ def mark_account_done(address):
             fh.write(f"{address.lower()}  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}\n")
     except Exception as e:
         print(f"  ⚠ не записал прогресс ({os.path.basename(DONE_FILE)}): {e}")
+
+
+def mark_account_failed(address, results):
+    """Записать упавший аккаунт в output/failed_accounts.txt (адрес + время + упавшие стадии).
+    В done он НЕ попадает → на следующем запуске пройдёт заново (авто-ретрай)."""
+    if not address:
+        return
+    bad = [str(r.get("stage")) for r in (results or []) if not r.get("ok")]
+    try:
+        new = not os.path.isfile(FAILED_FILE)
+        with open(FAILED_FILE, "a", encoding="utf-8") as fh:
+            if new:
+                fh.write("# Упавшие аккаунты (адрес + время UTC + упавшие стадии). "
+                         "В done НЕ попадают — пройдут заново при следующем запуске.\n")
+            fh.write(f"{address.lower()}  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}  "
+                     f"стадии: {', '.join(bad) or '?'}\n")
+    except Exception as e:
+        print(f"  ⚠ не записал {os.path.basename(FAILED_FILE)}: {e}")
 
 
 def _usd_num(eth, price):
@@ -484,7 +503,12 @@ def _run_wallets(cfg, args, keys):
         print_spent_report(results, price)
         save_run_report(wcfg, results, True, price)
         accounts.append({"address": wcfg.address, "results": results, "price": price})
-        mark_account_done(wcfg.address)        # отметить аккаунт прогнанным (для резюме)
+        # done — ТОЛЬКО если все стадии прошли; иначе в failed_accounts.txt + повтор на след. запуске
+        if results and all(r.get("ok") for r in results):
+            mark_account_done(wcfg.address)
+        else:
+            mark_account_failed(wcfg.address, results)
+            print(C.warn("  ⚠ были ошибки → аккаунт записан в failed_accounts.txt, повторю при следующем запуске"))
         if idx < len(wallets):
             d = _pick_delay(cfg.module_gap_sec)
             if d > 0:
