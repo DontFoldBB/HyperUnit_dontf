@@ -37,6 +37,7 @@ import stage_withdraw
 import stage_bitget_return
 import wallets_xlsx
 import bitget_api
+import net_proxy
 
 for _s in (sys.stdout, sys.stderr):
     try:
@@ -490,18 +491,33 @@ def _run_wallets(cfg, args, keys):
             print(C.warn(f"  ⚠ проверка субакков не удалась: {e}"))
     accounts = []
     for idx, wallet in enumerate(wallets, 1):
-        wcfg = config_loader.clone_for_wallet(cfg, wallet["private_key"], wallet["bitget_address"])
+        proxy = net_proxy.normalize_proxy(wallet.get("proxy"))
+        wcfg = config_loader.clone_for_wallet(cfg, wallet["private_key"],
+                                              wallet["bitget_address"], proxy)
         print(C.title("\n" + "#" * 64))
         print(C.title(f"#  АККАУНТ {idx}/{len(wallets)}: {wcfg.address or '??? плохой приватник'}"))
         print(C.title(f"#  возврат на Bitget: {wallet['bitget_address'] or '— не задан'}"))
+        print(C.title(f"#  прокси: {net_proxy.mask_proxy(proxy)}"))
         print(C.title("#" * 64))
         if not wcfg.address:
             print(C.err("  ✗ плохой приватник — пропускаю."))
             continue
-        results = run_stage_list(keys, wcfg, True, is_cycle=(len(keys) > 1), assume_yes=True)
-        price = _eth_price_usd()
-        print_spent_report(results, price)
-        save_run_report(wcfg, results, True, price)
+        # Прокси аккаунта: проверим живость и покажем exit-IP. Не блокирует — трафик всё
+        # равно пойдёт через прокси (на основной IP аккаунт не выпускаем).
+        if proxy:
+            try:
+                ip = net_proxy.proxy_exit_ip(proxy)
+                print(C.dim(f"  🌐 прокси ОК | exit IP: {ip}"))
+            except Exception as e:
+                print(C.warn(f"  ⚠ прокси не ответил на проверке ({e}); всё равно иду через него"))
+        else:
+            print(C.warn("  ⚠ прокси не задан (столбец C в wallets.xlsx) — аккаунт идёт на ОСНОВНОМ IP"))
+        # Весь HTTP-трафик аккаунта — через его прокси (Bitget исключён, если proxy_bitget=false).
+        with net_proxy.account_proxy(proxy, bitget_through_proxy=getattr(cfg, "proxy_bitget", False)):
+            results = run_stage_list(keys, wcfg, True, is_cycle=(len(keys) > 1), assume_yes=True)
+            price = _eth_price_usd()
+            print_spent_report(results, price)
+            save_run_report(wcfg, results, True, price)
         accounts.append({"address": wcfg.address, "results": results, "price": price})
         # done — ТОЛЬКО если все ВКЛЮЧЁННЫЕ стадии прошли (results = только включённые); иначе failed + повтор
         if results and all(r.get("ok") for r in results):

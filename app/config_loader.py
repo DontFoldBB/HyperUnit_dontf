@@ -167,6 +167,10 @@ class Config:
         self.randomize_wallets = bool(js.get("randomize_wallets", False))
         # резюме после обрыва: пропускать аккаунты, уже записанные в output/done_accounts.txt
         self.skip_done_accounts = bool(js.get("skip_done_accounts", True))
+        # прокси аккаунта (из wallets.xlsx, столбец C) — на каждый кошелёк свой; "" = основной IP
+        self.proxy = ""
+        # пускать ли Bitget тоже через прокси. По умолчанию НЕТ (его API на IP-whitelist — основной IP)
+        self.proxy_bitget = bool(js.get("proxy_bitget", False))
         # Builder-комиссия Hyperliquid (монетизация): в конфиге только тумблер;
         # адрес и ставка вшиты в lib/circle.py (BUILDER_ADDRESS/BUILDER_FEE).
         self.builder = {"enabled": bool(js.get("builder_codes", False))}
@@ -251,10 +255,11 @@ def load(env_path=ENV_PATH, config_path=CONFIG_PATH):
     return Config(load_env(env_path), load_json(config_path))
 
 
-def clone_for_wallet(cfg, private_key, bitget_address):
-    """Копия конфига под конкретный кошелёк батча: свой приватник и адрес возврата на Bitget."""
+def clone_for_wallet(cfg, private_key, bitget_address, proxy=""):
+    """Копия конфига под конкретный кошелёк батча: свой приватник, адрес возврата на Bitget и прокси."""
     import copy
     w = copy.copy(cfg)
+    w.proxy = (proxy or "").strip()
     w.bitget_cfg = dict(cfg.bitget_cfg)
     w.deposit_cfg = dict(cfg.deposit_cfg)
     w.trade_cfg = dict(cfg.trade_cfg)

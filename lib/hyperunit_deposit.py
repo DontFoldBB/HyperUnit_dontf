@@ -38,6 +38,7 @@ try:
     import requests
 except ImportError:
     sys.exit("Нужен requests:  pip install requests")
+import cf_http  # GET к Unit с браузерным TLS (curl_cffi) против Cloudflare; фоллбэк на requests
 try:
     from web3 import Web3
 except ImportError:
@@ -113,7 +114,9 @@ def load_dotenv():
 #  Unit API                                                                   #
 # --------------------------------------------------------------------------- #
 def api_get(path, timeout=25):
-    resp = requests.get(API_BASE + path, headers={"Accept": "application/json"}, timeout=timeout)
+    # curl_cffi с браузерным TLS — иначе Cloudflare у Unit отдаёт 403. Только Accept в
+    # заголовках (свой User-Agent сломал бы impersonate). Прокси — из env (net_proxy).
+    resp = cf_http.get(API_BASE + path, headers={"Accept": "application/json"}, timeout=timeout)
     try:
         data = resp.json()
     except ValueError:

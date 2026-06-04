@@ -56,6 +56,7 @@ try:
     import requests
 except ImportError:
     sys.exit("Нужен модуль requests:  pip install requests")
+import cf_http  # GET к Unit с браузерным TLS (curl_cffi) против Cloudflare; фоллбэк на requests
 
 try:
     from eth_account import Account
@@ -154,7 +155,9 @@ def _load_dotenv():
 # --------------------------------------------------------------------------- #
 def api_get(path, testnet=False, timeout=25):
     base = API_BASE_TESTNET if testnet else API_BASE
-    resp = requests.get(base + path, headers={"Accept": "application/json"}, timeout=timeout)
+    # curl_cffi с браузерным TLS — иначе Cloudflare у Unit отдаёт 403. Только Accept в
+    # заголовках (свой User-Agent сломал бы impersonate). Прокси — из env (net_proxy).
+    resp = cf_http.get(base + path, headers={"Accept": "application/json"}, timeout=timeout)
     try:
         data = resp.json()
     except ValueError:

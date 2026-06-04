@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Чтение списка кошельков из Excel (wallets.xlsx).
-Столбцы: A = приватный ключ, B = адрес депозита Bitget (куда вернуть ETH).
+Столбцы: A = приватный ключ, B = адрес депозита Bitget (куда вернуть ETH),
+         C = прокси аккаунта (опц.): http://user:pass@host:port | host:port:user:pass | host:port.
 Первая строка может быть заголовком (определяется автоматически и пропускается).
 Пустые строки и строки, начинающиеся с '#', игнорируются.
 """
@@ -22,7 +23,7 @@ def _looks_pk(s):
 
 
 def read_wallets(path=None):
-    """-> список dict {private_key, bitget_address}. Бросает FileNotFoundError/ValueError."""
+    """-> список dict {private_key, bitget_address, proxy}. Бросает FileNotFoundError/ValueError."""
     from openpyxl import load_workbook
     path = path or DEFAULT_FILE
     if not os.path.isfile(path):
@@ -38,12 +39,13 @@ def read_wallets(path=None):
             continue
         pk = cells[0]
         addr = cells[1] if len(cells) > 1 else ""
+        proxy = cells[2] if len(cells) > 2 else ""
         if not pk or pk.startswith("#"):
             continue
         # строка-заголовок (не приватник + похоже на подпись столбца) — пропускаем
         if not _looks_pk(pk) and any(h in pk.lower() for h in _HEADER_HINTS):
             continue
-        out.append({"private_key": pk, "bitget_address": addr})
+        out.append({"private_key": pk, "bitget_address": addr, "proxy": proxy})
     wb.close()
     return out
 

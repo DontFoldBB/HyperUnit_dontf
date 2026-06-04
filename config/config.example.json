@@ -25,6 +25,10 @@
   // Если хоть одна включённая стадия упала → output/failed_accounts.txt и повтор на следующем запуске. Удали done_accounts.txt, чтобы прогнать всех заново.
   "skip_done_accounts": true,    // true = пропускать успешно сделанные
 
+  // Прокси на КАЖДЫЙ аккаунт — в wallets.xlsx, столбец C. Форматы: http://user:pass@host:port | host:port:user:pass | host:port.
+  // Весь трафик аккаунта (Unit/Hyperliquid/RPC) идёт через его прокси; Bitget по умолчанию НЕ через прокси (его API на IP-whitelist).
+  "proxy_bitget": false,         // true = пускать и Bitget через прокси аккаунта (тогда добавь IP прокси в whitelist Bitget либо отключи whitelist)
+
   // Builder-комиссия Hyperliquid: маленький % с каждого ордера. Адрес и ставка вшиты в код — здесь только вкл/выкл.
   "builder_codes": true,         // true = включить builder-комиссию
 
