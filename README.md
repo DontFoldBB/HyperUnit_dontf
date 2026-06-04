@@ -128,7 +128,7 @@ Over SSH the arrow-key menu works; in a non-interactive/piped run it automatical
 The **`output\`** folder (created automatically):
 - `runs_log.txt` — human-readable: what happened on each account (withdraw, deposit, volumes, fees);
 - `runs.csv` / `accounts.csv` — the same for Excel;
-- the key figure — **volume run through Unit** (deposit + withdrawal) and total fees.
+- the key figure — **volume in Unit** (deposit + withdrawal) and total fees.
 
 ---
 
