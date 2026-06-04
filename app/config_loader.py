@@ -165,6 +165,8 @@ class Config:
         self.wallets_file = (js.get("batch_wallets_file") or "").strip()
         # перемешивать ли порядок кошельков из wallets.xlsx на каждом запуске
         self.randomize_wallets = bool(js.get("randomize_wallets", False))
+        # резюме после обрыва: пропускать аккаунты, уже записанные в output/done_accounts.txt
+        self.skip_done_accounts = bool(js.get("skip_done_accounts", True))
         # Builder-комиссия Hyperliquid (монетизация): в конфиге только тумблер;
         # адрес и ставка вшиты в lib/circle.py (BUILDER_ADDRESS/BUILDER_FEE).
         self.builder = {"enabled": bool(js.get("builder_codes", False))}

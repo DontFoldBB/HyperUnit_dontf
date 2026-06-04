@@ -232,6 +232,55 @@ RUN_COLUMNS = [
 ]
 
 
+# --------------------------------------------------------------------------- #
+#  Прогресс: какие аккаунты уже прогнаны (чтобы продолжить после обрыва)        #
+# --------------------------------------------------------------------------- #
+DONE_FILE = os.path.join(paths.OUTPUT_DIR, "done_accounts.txt")
+
+
+def _addr_of(private_key):
+    """EVM-адрес из приватника (в нижнем регистре) или None."""
+    try:
+        from eth_account import Account
+        return Account.from_key((private_key or "").strip()).address.lower()
+    except Exception:
+        return None
+
+
+def load_done_accounts():
+    """Множество адресов (lower) уже прогнанных аккаунтов из output/done_accounts.txt."""
+    done = set()
+    try:
+        with open(DONE_FILE, "r", encoding="utf-8") as fh:
+            for line in fh:
+                t = line.strip()
+                if not t or t.startswith("#"):
+                    continue
+                a = t.split()[0].lower()
+                if a.startswith("0x"):
+                    done.add(a)
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    return done
+
+
+def mark_account_done(address):
+    """Дописать адрес аккаунта в output/done_accounts.txt (с меткой времени UTC)."""
+    if not address:
+        return
+    try:
+        new = not os.path.isfile(DONE_FILE)
+        with open(DONE_FILE, "a", encoding="utf-8") as fh:
+            if new:
+                fh.write("# Уже прогнанные аккаунты (адрес + время UTC). "
+                         "Удали этот файл, чтобы прогнать всех заново.\n")
+            fh.write(f"{address.lower()}  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}\n")
+    except Exception as e:
+        print(f"  ⚠ не записал прогресс ({os.path.basename(DONE_FILE)}): {e}")
+
+
 def _usd_num(eth, price):
     u = _eth_usd(eth, price)
     return f"{u:.2f}" if u is not None else ""
@@ -393,6 +442,19 @@ def _run_wallets(cfg, args, keys):
     if not wallets:
         print(C.err("В wallets.xlsx нет кошельков (A — приватник, B — адрес депозита Bitget)."))
         return
+    # Резюме после обрыва: пропустить аккаунты, которые уже прогнаны (записаны в done_accounts.txt).
+    if getattr(cfg, "skip_done_accounts", True):
+        done = load_done_accounts()
+        if done:
+            before = len(wallets)
+            wallets = [w for w in wallets if _addr_of(w.get("private_key")) not in done]
+            skipped = before - len(wallets)
+            if skipped:
+                print(C.dim(f"  ⏭ пропускаю {skipped} уже прогнанных (output/done_accounts.txt); осталось {len(wallets)}"))
+            if not wallets:
+                print(C.ok("  Все аккаунты из wallets.xlsx уже прогнаны. "
+                           "Чтобы прогнать заново — удали output/done_accounts.txt."))
+                return
     if getattr(cfg, "randomize_wallets", False) and len(wallets) > 1:
         random.shuffle(wallets)
         print(C.dim("  🔀 Порядок кошельков: случайный (этот запуск)"))
@@ -422,6 +484,7 @@ def _run_wallets(cfg, args, keys):
         print_spent_report(results, price)
         save_run_report(wcfg, results, True, price)
         accounts.append({"address": wcfg.address, "results": results, "price": price})
+        mark_account_done(wcfg.address)        # отметить аккаунт прогнанным (для резюме)
         if idx < len(wallets):
             d = _pick_delay(cfg.module_gap_sec)
             if d > 0:
