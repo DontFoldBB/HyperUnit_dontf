@@ -158,7 +158,7 @@ def _rows(cfg):
     skp = getattr(cfg, "skip_done_accounts", True)
     sbox_c = f"{GREEN}[✓]{RESET}" if skp else f"{GREY}[ ]{RESET}"
     sbox_p = "[✓]" if skp else "[ ]"
-    sname = "Пропускать прогнанные (резюме)"
+    sname = "Пропускать уже сделанные (из output/done_accounts.txt)"
     rows.append(("opt:skipdone", f"{sbox_c} {CYAN}{sname}{RESET}", f"{sbox_p} {sname}"))
 
     cyc = _cycle_str(cfg)

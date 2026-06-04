@@ -101,7 +101,7 @@ An arrow-key menu opens (the in-app menu is in Russian):
     [✓] Withdraw ETH from Hyperliquid (Unit)
     [✓] Return ETH to Bitget
     [✓] Shuffle wallet order
-    [✓] Skip processed accounts (resume)
+    [✓] Skip already-done (from output/done_accounts.txt)
         ▶ RUN over wallets.xlsx
         Exit
 ```

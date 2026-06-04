@@ -274,8 +274,8 @@ def mark_account_done(address):
         new = not os.path.isfile(DONE_FILE)
         with open(DONE_FILE, "a", encoding="utf-8") as fh:
             if new:
-                fh.write("# Уже прогнанные аккаунты (адрес + время UTC). "
-                         "Удали этот файл, чтобы прогнать всех заново.\n")
+                fh.write("# Уже сделанные аккаунты (адрес + время UTC). "
+                         "Удали этот файл, чтобы пройти всех заново.\n")
             fh.write(f"{address.lower()}  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}\n")
     except Exception as e:
         print(f"  ⚠ не записал прогресс ({os.path.basename(DONE_FILE)}): {e}")
@@ -450,10 +450,10 @@ def _run_wallets(cfg, args, keys):
             wallets = [w for w in wallets if _addr_of(w.get("private_key")) not in done]
             skipped = before - len(wallets)
             if skipped:
-                print(C.dim(f"  ⏭ пропускаю {skipped} уже прогнанных (output/done_accounts.txt); осталось {len(wallets)}"))
+                print(C.dim(f"  ⏭ пропускаю {skipped} уже сделанных (output/done_accounts.txt); осталось {len(wallets)}"))
             if not wallets:
-                print(C.ok("  Все аккаунты из wallets.xlsx уже прогнаны. "
-                           "Чтобы прогнать заново — удали output/done_accounts.txt."))
+                print(C.ok("  Все аккаунты из wallets.xlsx уже сделаны. "
+                           "Удали output/done_accounts.txt, чтобы пройти всех заново."))
                 return
     if getattr(cfg, "randomize_wallets", False) and len(wallets) > 1:
         random.shuffle(wallets)
@@ -599,7 +599,7 @@ def menu_loop(cfg, args):
         rnd = "[✓ ВКЛ ]" if getattr(cfg, "randomize_wallets", False) else "[✗ выкл]"
         print(f"    r) {rnd}  Случайный порядок кошельков")
         skp = "[✓ ВКЛ ]" if getattr(cfg, "skip_done_accounts", True) else "[✗ выкл]"
-        print(f"    d) {skp}  Пропускать прогнанные (резюме)")
+        print(f"    d) {skp}  Пропускать уже сделанные (из output/done_accounts.txt)")
         print(f"    s) ▶ ЗАПУСТИТЬ по wallets.xlsx:  {cyc_str}")
         print("    0) Выход")
         choice = input("  Выбор: ").strip().lower()
@@ -624,7 +624,7 @@ def menu_loop(cfg, args):
             _do_run(cfg, args)
             input("\n  Enter — вернуться в меню… ")
             continue
-        print("  Не понял. Цифры 1-5 — вкл/выкл, r — случайный порядок, d — пропуск прогнанных, s — запуск, 0 — выход.")
+        print("  Не понял. Цифры 1-5 — вкл/выкл, r — случайный порядок, d — пропуск сделанных, s — запуск, 0 — выход.")
 
 
 # --------------------------------------------------------------------------- #
