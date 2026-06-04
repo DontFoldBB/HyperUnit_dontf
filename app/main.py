@@ -233,7 +233,7 @@ RUN_COLUMNS = [
 
 
 # --------------------------------------------------------------------------- #
-#  Прогресс: done (все стадии прошли) / failed (упал) — резюме + авто-ретрай     #
+#  Прогресс: done (все ВКЛЮЧЁННЫЕ стадии прошли) / failed (упал) — резюме+ретрай  #
 # --------------------------------------------------------------------------- #
 DONE_FILE = os.path.join(paths.OUTPUT_DIR, "done_accounts.txt")
 FAILED_FILE = os.path.join(paths.OUTPUT_DIR, "failed_accounts.txt")
@@ -503,7 +503,7 @@ def _run_wallets(cfg, args, keys):
         print_spent_report(results, price)
         save_run_report(wcfg, results, True, price)
         accounts.append({"address": wcfg.address, "results": results, "price": price})
-        # done — ТОЛЬКО если все стадии прошли; иначе в failed_accounts.txt + повтор на след. запуске
+        # done — ТОЛЬКО если все ВКЛЮЧЁННЫЕ стадии прошли (results = только включённые); иначе failed + повтор
         if results and all(r.get("ok") for r in results):
             mark_account_done(wcfg.address)
         else:
