@@ -228,13 +228,26 @@ def ensure_margin(ex, info, addr, account, need, live, rows) -> bool:
 
 # ----------------------------- лог ----------------------------- #
 def log_event(rows, action, asset, side, size, price, status):
+    # Лог НИКОГДА не должен ронять торговую стадию: безопасно приводим к числам и
+    # глушим любые ошибки форматирования (одна строка лога не стоит срыва цикла с деньгами).
+    try:
+        size = float(size)
+    except (TypeError, ValueError):
+        size = 0.0
+    try:
+        price = float(price)
+    except (TypeError, ValueError):
+        price = 0.0
     usd = size * price
-    rows.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), action, asset, side,
-                 f"{size:.6f}", f"{price:.4f}", f"{usd:.2f}", status])
-    st = str(status)
-    col = "green" if st == "ок" else ("red" if "ОШИБКА" in st else "grey")
-    print(f"    -> {_paint(action, 'cyan')} {asset} {side} {size} @ {price} "
-          f"(~{fmt(usd)}) [{_paint(st, col)}]")
+    try:
+        rows.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), action, asset, side,
+                     f"{size:.6f}", f"{price:.4f}", f"{usd:.2f}", status])
+        st = str(status)
+        col = "green" if st == "ок" else ("red" if "ОШИБКА" in st else "grey")
+        print(f"    -> {_paint(action, 'cyan')} {asset} {side} {size} @ {price} "
+              f"(~{fmt(usd)}) [{_paint(st, col)}]")
+    except Exception as e:
+        print(f"    -> {action} {asset} {side} (лог не записан: {e})")
 
 
 def write_logs(addr, rows, summary):
