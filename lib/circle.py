@@ -392,6 +392,16 @@ def wait(mins, what, live):
         time.sleep(sec)
 
 
+def step_pause(gap, what, live):
+    """Человеческая пауза между макро-шагами цикла: рандом из gap_minutes, но не меньше 2с
+    (балансам надо осесть перед следующим чтением). В тест-режиме — без паузы."""
+    if not live:
+        return
+    sec = max(2.0, _pick(gap) * 60.0)
+    print(f"    ⏳ пауза {sec:.0f}с — {what}")
+    time.sleep(sec)
+
+
 # --------------------- лимитные спот-ордера (с переустановкой) --------------------- #
 def _round_px(ex, coin, is_buy, px):
     """Округлить цену под правила HL (5 знач. цифр / тики). Без слиппеджа."""
@@ -526,8 +536,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
             log_event(rows, "Продажа UETH", ETH_TOKEN, "sell", sz, spot_px, "ТЕСТ")
     else:
         print("    X UETH мало (<$10)")
-    if live:
-        time.sleep(2)
+    step_pause(gap, "перед торговлей", live)
 
     budget = spot_free(info, addr, "USDC") if live else ueth_before * spot_px + spot_free(info, addr, "USDC")
     requested = budget * pct / 100.0
@@ -614,7 +623,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
     # маржу из спота (после HIP-3 маржа осталась на dex-аккаунте).
     if live and hip3_assets and hip_ok and perp_kind and perp_ok:
         move_usdc(ex, info, addr, DEX, "spot", acct_usdc(info, addr, DEX), live, rows)
-        time.sleep(1)
+        step_pause(gap, "перед перпами", live)
 
     # ===== ФАЗА ПЕРПЫ: крутим пару/один перп до target_perp (0 = один проход) =====
     if perp_kind and perp_ok:
@@ -655,14 +664,13 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
             for pos in open_positions(info, addr, dex):
                 print(f"    ! закрываю остаток {pos['coin']}")
                 ex.market_close(pos["coin"], slippage=0.08); time.sleep(1)
-        time.sleep(2)
+        step_pause(gap, "перед возвратом USDC на спот", live)
 
     # 4) USDC обратно на спот
     print(_paint("\n  ▸ Возвращаю USDC на спот", "cyan", "bold"))
     move_usdc(ex, info, addr, DEX, "spot", acct_usdc(info, addr, DEX) if live else 0, live, rows)
     move_usdc(ex, info, addr, "", "spot", acct_usdc(info, addr, "") if live else 0, live, rows)
-    if live:
-        time.sleep(2)
+    step_pause(gap, "перед выкупом UETH", live)
 
     # 5) купить UETH на USDC ЛИМИТКОЙ, ОСТАВИВ резерв (для вывода через Unit нужен ~1 USDC).
     # Лимитка по точной цене не требует запаса на слиппедж -> на споте останется ~резерв,
