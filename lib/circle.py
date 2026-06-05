@@ -801,19 +801,33 @@ def _harden_retries(ex, tries=4, backoff=0.7):
 
 def setup_account(private_key: str, account_address: str = None,
                   base_url: str = constants.MAINNET_API_URL):
-    """Создаёт подключение. Возвращает (ex, info, addr, spot_coin, spot_szdec, specs)."""
+    """Создаёт подключение к Hyperliquid с РЕТРАЯМИ при обрыве прокси/сети.
+    Конструктор Exchange/Info сам ходит в сеть (meta/perpDexs) ДО навешивания ретраев,
+    поэтому повторяем ВСЮ сборку. Возвращает (ex, info, addr, spot_coin, spot_szdec, specs)."""
+    import requests as _rq
     wallet = eth_account.Account.from_key(private_key.strip())
     addr = account_address or wallet.address
-    ex = Exchange(wallet, base_url, account_address=addr, perp_dexs=["", DEX])
-    info = ex.info
-    _harden_retries(ex)              # ретраи на обрывах прокси/сети для всех вызовов SDK
-    spot_coin, spot_szdec = resolve_spot_coin(info, ETH_TOKEN)
-    specs = {}
-    for dx in ("", DEX):
-        for a in info.meta(dx)["universe"]:
-            specs[a["name"]] = {"szDecimals": int(a["szDecimals"]),
-                                "maxLeverage": int(a.get("maxLeverage", 1))}
-    return ex, info, addr, spot_coin, spot_szdec, specs
+    last = None
+    for attempt in range(1, 6):
+        try:
+            ex = Exchange(wallet, base_url, account_address=addr, perp_dexs=["", DEX])
+            info = ex.info
+            _harden_retries(ex)          # ретраи на обрывах прокси/сети для текущих вызовов SDK
+            spot_coin, spot_szdec = resolve_spot_coin(info, ETH_TOKEN)
+            specs = {}
+            for dx in ("", DEX):
+                for a in info.meta(dx)["universe"]:
+                    specs[a["name"]] = {"szDecimals": int(a["szDecimals"]),
+                                        "maxLeverage": int(a.get("maxLeverage", 1))}
+            return ex, info, addr, spot_coin, spot_szdec, specs
+        except _rq.exceptions.RequestException as e:   # обрыв прокси/сети при подключении к HL
+            last = e
+            if attempt < 5:
+                w = 0.7 * (2 ** (attempt - 1))
+                print(f"    ↻ подключение к Hyperliquid не удалось (попытка {attempt}/5): "
+                      f"{type(e).__name__}. Повтор через {w:.0f}с…")
+                time.sleep(w)
+    raise last
 
 
 def account_status(private_key: str, account_address: str = None,
