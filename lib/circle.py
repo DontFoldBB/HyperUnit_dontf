@@ -379,6 +379,100 @@ def wait(mins, what, live):
         time.sleep(sec)
 
 
+# --------------------- лимитные спот-ордера (с переустановкой) --------------------- #
+def _round_px(ex, coin, is_buy, px):
+    """Округлить цену под правила HL (5 знач. цифр / тики). Без слиппеджа."""
+    try:
+        return ex._slippage_price(coin, is_buy, 0.0, px)
+    except Exception:
+        return float(f"{px:.5g}")
+
+
+def _resting_oid(r):
+    """oid висящего лимит-ордера из ответа; None если исполнился сразу/ошибка."""
+    try:
+        st = r["response"]["data"]["statuses"][0]
+        return st["resting"]["oid"] if "resting" in st else None
+    except Exception:
+        return None
+
+
+def _order_done(info, addr, oid):
+    """True, если ордер oid больше НЕ 'open' (исполнен/снят/неизвестен)."""
+    try:
+        r = info.query_order_by_oid(addr, oid)
+        inner = r.get("order") if isinstance(r, dict) else None
+        return ((inner or {}).get("status") or "done") != "open"
+    except Exception:
+        return False
+
+
+def _cancel_coin_orders(ex, info, addr, coin):
+    """Снять все висящие ордера по coin (страховка от орфанов с залоченными средствами)."""
+    try:
+        for o in (info.open_orders(addr) or []):
+            if o.get("coin") == coin and o.get("oid") is not None:
+                try:
+                    ex.cancel(coin, o["oid"])
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+def spot_limit_fill(ex, info, addr, coin, is_buy, need_fn, szdec, rows, label, out_token,
+                    wait_s=10.0, repegs=8, final_cross=0.004):
+    """Исполнить нужный объём ЛИМИТКОЙ по текущему миду с переустановкой каждые wait_s сек.
+
+    need_fn(mid) -> сколько ЕЩЁ монет надо (пересчёт по балансу каждую итерацию, поэтому
+    частичные исполнения учитываются сами). Не исполнилось за wait_s — снимаем и ставим заново
+    на свежий мид. Последняя попытка чуть крестит спред (final_cross), чтобы гарантированно
+    добить. Лимитка по точной цене не требует запаса на слиппедж → меньше потерь/остатка, чем
+    маркет. Возвращает исполненный объём в USD (по приросту out_token)."""
+    vol = 0.0
+    for attempt in range(int(repegs) + 1):
+        mid = get_mid(info, coin)
+        if not mid:
+            break
+        sz = int(max(0.0, need_fn(mid)) * 10 ** szdec) / 10 ** szdec
+        if sz <= 0 or sz * mid < MIN_ORDER:
+            break
+        cross = final_cross if attempt == repegs else 0.0
+        px = _round_px(ex, coin, is_buy, mid * (1 + cross) if is_buy else mid * (1 - cross))
+        out_before = spot_free(info, addr, out_token)
+        try:
+            r = ex.order(coin, is_buy, sz, px, {"limit": {"tif": "Gtc"}})
+        except Exception as e:
+            print(f"    ! лимитка {label}: {e}")
+            break
+        if not is_ok(r):
+            log_event(rows, label, ETH_TOKEN, "buy" if is_buy else "sell", sz, px, f"ОШИБКА {r}")
+            break
+        oid = _resting_oid(r)
+        if oid is not None:
+            waited, filled = 0.0, False
+            while waited < wait_s:
+                time.sleep(1.0)
+                waited += 1.0
+                if _order_done(info, addr, oid):
+                    filled = True
+                    break
+            if not filled:
+                try:
+                    ex.cancel(coin, oid)
+                except Exception:
+                    pass
+                print(f"    ↻ {label}: не исполнилось за {wait_s:.0f}с — переставляю на текущую цену")
+        time.sleep(1.2)  # дать залоку/балансам обновиться
+        got = max(0.0, spot_free(info, addr, out_token) - out_before)
+        if got > 0:
+            vol += got if out_token == "USDC" else got * px
+            log_event(rows, label, ETH_TOKEN, "buy" if is_buy else "sell",
+                      sz if out_token == "USDC" else got, px, "ок")
+    _cancel_coin_orders(ex, info, addr, coin)  # подчистить возможные орфаны
+    return vol
+
+
 # ----------------------------- круг ----------------------------- #
 def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, perp_arg,
         pct, lev, target_hip3, target_perp, hold, gap, live, log_csv=True, reserve_usdc=RESERVE_USDC,
@@ -395,18 +489,26 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
     spot_px = get_mid(info, spot_coin)
     print(f"\n  Старт: {ueth_before} {ETH_TOKEN} (~{fmt(ueth_before*spot_px)})")
 
-    # 1) продать UETH
+    # 1) продать UETH -> USDC ЛИМИТКОЙ (переустановка каждые 10с; меньше слиппеджа, чем маркет)
     vol_spot = 0.0   # объём на споте (продажа + покупка UETH)
-    print(_paint("\n  ▸ Продаю UETH -> USDC", "cyan", "bold"))
-    sz = int(ueth_before * 10**spot_szdec) / 10**spot_szdec
-    if sz * spot_px >= MIN_ORDER:
+    print(_paint("\n  ▸ Продаю UETH -> USDC (лимиткой)", "cyan", "bold"))
+    if ueth_before * spot_px >= MIN_ORDER:
         if live:
-            r = ex.market_open(spot_coin, False, sz, px=spot_px, slippage=SPOT_SLIPPAGE)
-            sv, fpx = fill_info(r)
-            vol_spot += sv
-            log_event(rows, "Продажа UETH", ETH_TOKEN, "sell", sz, fpx or spot_px,
-                      "ок" if is_ok(r) else f"ОШИБКА {r}")
+            vol_spot += spot_limit_fill(
+                ex, info, addr, spot_coin, False,
+                lambda _mid: spot_free(info, addr, ETH_TOKEN),
+                spot_szdec, rows, "Продажа UETH", "USDC")
+            # страховка: лимитка не добила и UETH ещё на >= минимум — добиваем маркетом
+            rest = spot_free(info, addr, ETH_TOKEN)
+            if rest * get_mid(info, spot_coin) >= MIN_ORDER:
+                szr = int(rest * 10**spot_szdec) / 10**spot_szdec
+                r = ex.market_open(spot_coin, False, szr, slippage=SPOT_SLIPPAGE)
+                sv, fpx = fill_info(r)
+                vol_spot += sv
+                log_event(rows, "Продажа UETH (маркет-добор)", ETH_TOKEN, "sell", szr,
+                          fpx or spot_px, "ок" if is_ok(r) else f"ОШИБКА {r}")
         else:
+            sz = int(ueth_before * 10**spot_szdec) / 10**spot_szdec
             vol_spot += sz * spot_px
             log_event(rows, "Продажа UETH", ETH_TOKEN, "sell", sz, spot_px, "ТЕСТ")
     else:
@@ -549,24 +651,38 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
     if live:
         time.sleep(2)
 
-    # 5) купить UETH на USDC, ОСТАВИВ резерв (для вывода через Hyperunit нужен ~1 USDC)
-    print(_paint(f"\n  ▸ Покупаю UETH (оставляю резерв {fmt(reserve_usdc)} USDC на споте)", "cyan", "bold"))
-    usdc2 = spot_free(info, addr, "USDC") if live else budget
-    spendable = max(0.0, usdc2 - reserve_usdc)
-    px = get_mid(info, spot_coin)
-    sz = int(spendable / (px * (1 + SPOT_SLIPPAGE) * 1.003) * 10**spot_szdec) / 10**spot_szdec if px else 0
-    if sz * px >= MIN_ORDER:
-        if live:
-            r = ex.market_open(spot_coin, True, sz, px=px, slippage=SPOT_SLIPPAGE)
+    # 5) купить UETH на USDC ЛИМИТКОЙ, ОСТАВИВ резерв (для вывода через Unit нужен ~1 USDC).
+    # Лимитка по точной цене не требует запаса на слиппедж -> на споте останется ~резерв,
+    # а не +1-3$ как при маркете (он резал 1.3% от суммы выкупа про запас).
+    print(_paint(f"\n  ▸ Покупаю UETH лимиткой (оставляю резерв {fmt(reserve_usdc)} USDC на споте)", "cyan", "bold"))
+    if live:
+        before_buy = vol_spot
+        # buf=0.0015 покрывает комиссию/округление; sz считается из остатка USDC каждую итерацию
+        vol_spot += spot_limit_fill(
+            ex, info, addr, spot_coin, True,
+            lambda mid: max(0.0, spot_free(info, addr, "USDC") - reserve_usdc) / (mid * 1.0015),
+            spot_szdec, rows, "Покупка UETH", ETH_TOKEN)
+        # страховка: если лимитка оставила КРУПНЫЙ остаток (>= минимума ордера) — добить маркетом
+        px = get_mid(info, spot_coin)
+        spend_rest = max(0.0, spot_free(info, addr, "USDC") - reserve_usdc)
+        szf = int(spend_rest / (px * (1 + SPOT_SLIPPAGE) * 1.003) * 10**spot_szdec) / 10**spot_szdec if px else 0
+        if szf * px >= MIN_ORDER:
+            r = ex.market_open(spot_coin, True, szf, px=px, slippage=SPOT_SLIPPAGE)
             sv, fpx = fill_info(r)
             vol_spot += sv
-            log_event(rows, "Покупка UETH", ETH_TOKEN, "buy", sz, fpx or px,
+            log_event(rows, "Покупка UETH (маркет-добор)", ETH_TOKEN, "buy", szf, fpx or px,
                       "ок" if is_ok(r) else f"ОШИБКА {r}")
-        else:
+        elif vol_spot == before_buy:
+            print("    X для покупки осталось мало - оставляю USDC как есть")
+    else:
+        px = get_mid(info, spot_coin)
+        spendable = max(0.0, budget - reserve_usdc)
+        sz = int(spendable / (px * 1.0015) * 10**spot_szdec) / 10**spot_szdec if px else 0
+        if sz * px >= MIN_ORDER:
             vol_spot += sz * px
             log_event(rows, "Покупка UETH", ETH_TOKEN, "buy", sz, px, "ТЕСТ")
-    else:
-        print(f"    X для покупки осталось мало ({fmt(spendable)}) - оставляю USDC как есть")
+        else:
+            print(f"    X для покупки осталось мало ({fmt(spendable)}) - оставляю USDC как есть")
 
     # итог
     if live:
