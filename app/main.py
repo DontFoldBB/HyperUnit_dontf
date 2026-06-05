@@ -56,6 +56,15 @@ STAGES = {
 CYCLE_ORDER = ["bitget", "deposit", "trade", "withdraw", "bitget_return"]
 NUM_TO_KEY = {str(i): k for i, k in enumerate(CYCLE_ORDER, 1)}   # "1".."5" -> стадия
 
+# Зависимости стадий: шаг имеет смысл, только если его «поставщик средств» отработал.
+#   deposit  ← bitget   (нет прихода ETH на кошелёк — депать нечего)
+#   trade    ← deposit  (нет средств на Hyperliquid — торговать нечем)
+#   withdraw ← deposit  (нет средств на Hyperliquid — выводить нечего)
+# bitget_return НИ ОТ ЧЕГО не зависит: возвращает остаток с кошелька (в т.ч. ETH после
+# неудавшегося депозита — страховка от застревания средств). Зависимость применяется,
+# только если шаг-поставщик включён в этот прогон (частичные запуски не ломаем).
+STAGE_DEPENDS = {"deposit": "bitget", "trade": "deposit", "withdraw": "deposit"}
+
 
 def enabled_cycle(cfg):
     """Стадии для режима «весь цикл», только включённые (enabled=true)."""
@@ -403,14 +412,27 @@ def _pick_delay(spec):
 
 def run_stage_list(keys, cfg, live, is_cycle, assume_yes):
     results = []
+    ok_by_stage = {}   # стадия -> успех (для проверки зависимостей в этом прогоне)
     for i, key in enumerate(keys, 1):
         if is_cycle:
             print(C.cycle(f"\n  ─────── Шаг {i}/{len(keys)}: {STAGES[key][0]} ───────"))
+        # Зависимость: если нужный предыдущий шаг был в прогоне, но НЕ удался — пропускаем
+        # (нельзя торговать/выводить без средств на HL, нельзя депать без прихода с Bitget).
+        dep = STAGE_DEPENDS.get(key)
+        if dep and dep in keys and not ok_by_stage.get(dep, False):
+            r = {"stage": key, "ok": False,
+                 "summary": f"пропущено — предыдущий шаг «{STAGES[dep][0]}» не выполнен",
+                 "spent": {}}
+            results.append(r)
+            ok_by_stage[key] = False
+            print_stage_result(r)
+            continue
         r = run_one(key, cfg, live)
+        ok_by_stage[key] = bool(r.get("ok"))
         results.append(r)
         print_stage_result(r)
         if is_cycle and not r.get("ok") and i < len(keys):
-            print(C.warn("  ⚠ Стадия не удалась — продолжаю со следующей."))
+            print(C.warn("  ⚠ Стадия не удалась — зависимые шаги будут пропущены."))
         # человеческая пауза перед следующим модулем
         if is_cycle and i < len(keys):
             d = _pick_delay(cfg.module_gap_sec)
