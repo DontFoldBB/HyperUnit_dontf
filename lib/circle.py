@@ -350,10 +350,13 @@ def _jit_margin(per_margin, jitter):
     return per_margin
 
 
-def trade_hip3(ex, info, addr, coin, per_margin, lev, hold, specs, live, rows, jitter=0.0) -> float:
+def trade_hip3(ex, info, addr, coin, per_margin, lev, hold, specs, live, rows, jitter=0.0, manual=False) -> float:
     m = _jit_margin(per_margin, jitter)
-    ensure_margin(ex, info, addr, DEX, m * 1.15, live, rows)
-    vol = do_open(ex, info, addr, coin, "long", m, lev, False, specs, live, rows)
+    # manual (DEX abstraction ВЫКЛ / standard-режим): у каждого DEX свой баланс → фондим сам DEX
+    # (spot→DEX) и открываем ISOLATED. Иначе (unified / abstraction ВКЛ): прямой spot→DEX запрещён,
+    # поэтому фондим ОБЩИЙ перп-баланс (spot→perp) и открываем CROSS — залог шарится (один USDC).
+    ensure_margin(ex, info, addr, (DEX if manual else ""), m * 1.15, live, rows)
+    vol = do_open(ex, info, addr, coin, "long", m, lev, (not manual), specs, live, rows)
     if vol > 0:
         wait(hold, f"держим {coin}", live)
         vol += do_close(ex, info, addr, coin, specs, live, rows, vol)
@@ -499,7 +502,7 @@ def spot_limit_fill(ex, info, addr, coin, is_buy, need_fn, szdec, rows, label, o
 # ----------------------------- круг ----------------------------- #
 def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, perp_arg,
         pct, lev, target_hip3, target_perp, hold, gap, live, log_csv=True, reserve_usdc=RESERVE_USDC,
-        jitter=0.0, random_pick=False, builder=None):
+        jitter=0.0, random_pick=False, builder=None, manual_mode=False):
     rows: List[List[Any]] = []
     # builder-комиссия: подставить builder во ВСЕ ордера этого аккаунта (если включена).
     # Выключено (builder=None) -> обёрток нет, поведение 1-в-1 прежнее.
@@ -589,7 +592,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
                 print(_paint(f"\n   ~~ {coin}  (HIP-3: {fmt(vol_hip3)}"
                              f"{'' if one_pass_hip3 else '/'+fmt(target_hip3)}) ~~", "cyan"))
                 before = vol_hip3
-                vol_hip3 += trade_hip3(ex, info, addr, coin, per_margin_hip, lev, _pick(hold), specs, live, rows, jitter)
+                vol_hip3 += trade_hip3(ex, info, addr, coin, per_margin_hip, lev, _pick(hold), specs, live, rows, jitter, manual=manual_mode)
                 trades += 1
                 empty = 0 if vol_hip3 > before else empty + 1
                 if empty >= MAX_EMPTY:
@@ -605,7 +608,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
                     print(_paint(f"\n   ~~ {coin}  (HIP-3: {fmt(vol_hip3)}"
                                  f"{'' if one_pass_hip3 else '/'+fmt(target_hip3)}) ~~", "cyan"))
                     before = vol_hip3
-                    vol_hip3 += trade_hip3(ex, info, addr, coin, per_margin_hip, lev, _pick(hold), specs, live, rows, jitter)
+                    vol_hip3 += trade_hip3(ex, info, addr, coin, per_margin_hip, lev, _pick(hold), specs, live, rows, jitter, manual=manual_mode)
                     trades += 1
                     empty = 0 if vol_hip3 > before else empty + 1
                     if empty >= MAX_EMPTY:
@@ -862,6 +865,32 @@ def _builder_pct(fee, default=0.01):
         return default
 
 
+def ensure_standard_margin(ex, addr, live=True):
+    """Выключить DEX abstraction → стандартный режим маржи.
+
+    При включённой abstraction ручные переводы USDC (spot↔perp / spot↔HIP-3) блокируются
+    ('Cannot transfer with DEX abstraction enabled'), а залог для HIP-3 тянется автоматически
+    из ПЕРП-баланса (не со спота) — поэтому позиция падает с 'Insufficient margin'.
+    Стандартный режим возвращает ручные переводы, на которых построена торговая стадия
+    (HL сам рекомендует его для ботов и сворачивает abstraction). Идемпотентно, не фатально."""
+    if not live:
+        return
+    try:
+        r = ex.user_set_abstraction(addr, "disabled")
+        if is_ok(r):
+            print("  DEX abstraction: выключен (стандартный режим маржи)")
+            return
+        print(f"  DEX abstraction: ответ на выключение: {r} — пробую legacy-тумблер")
+    except Exception as e:
+        print(f"  (user_set_abstraction не прошёл: {e} — пробую legacy-тумблер)")
+    try:
+        r = ex.user_dex_abstraction(addr, False)
+        print("  DEX abstraction: выключен (legacy)" if is_ok(r)
+              else f"  ⚠ не удалось выключить DEX abstraction: {r} (если уже выключен — ок)")
+    except Exception as e:
+        print(f"  ⚠ не удалось выключить DEX abstraction: {e}")
+
+
 def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_coin: str = None,
                pct: float = 50, leverage=2, target_hip3: float = 0, target_perp: float = 0,
                hold_minutes=0.2, gap_minutes=0.1, live: bool = False,
@@ -869,7 +898,7 @@ def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_co
                log_csv: bool = True, reserve_usdc: float = RESERVE_USDC,
                hip3_count: int = None, shuffle: bool = False,
                size_jitter: float = 0.0, random_pick: bool = False,
-               builder_enabled: bool = False) -> dict:
+               builder_enabled: bool = False, disable_abstraction: bool = False) -> dict:
     """
     Прогнать круг программно (без вопросов в консоли). Возвращает dict с результатом
     (см. ключи в конце run(): ok, volume, positions_left, spent_usd, ...).
@@ -901,6 +930,12 @@ def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_co
                     набивая target_hip3; список = пул, из которого выбираем.
     """
     ex, info, addr, spot_coin, spot_szdec, specs = setup_account(private_key, account_address, base_url)
+
+    # Стандартный режим маржи (DEX abstraction off) — ТОЛЬКО если включено в конфиге. Нужно,
+    # когда переводы USDC падают 'Cannot transfer with DEX abstraction enabled'. По умолчанию
+    # выкл → режим аккаунта не трогаем (unified), HIP-3 фондится через перп-баланс + cross.
+    if disable_abstraction:
+        ensure_standard_margin(ex, addr, live=live)
 
     # Builder-комиссия (монетизация): адрес/ставка ВШИТЫ (BUILDER_ADDRESS/BUILDER_FEE); в конфиге только тумблер.
     builder = None
@@ -964,7 +999,8 @@ def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_co
     return run(ex, info, addr, spot_coin, spot_szdec, specs, norm, perp_kind, perp_arg,
                float(pct), lev_use, float(target_hip3), float(target_perp), hold_minutes,
                gap_minutes, bool(live), log_csv=log_csv, reserve_usdc=float(reserve_usdc),
-               jitter=float(size_jitter), random_pick=bool(random_pick), builder=builder)
+               jitter=float(size_jitter), random_pick=bool(random_pick), builder=builder,
+               manual_mode=bool(disable_abstraction))
 
 
 # ----------------------------- main (интерактив) ----------------------------- #

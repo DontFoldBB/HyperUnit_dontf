@@ -51,6 +51,8 @@ def run(cfg, live):
         size_jitter=float(t.get("size_jitter", 0.35)),  # размеры позиций разные (±%)
         # builder-комиссия (монетизация): тумблер в config; адрес/ставка вшиты в circle.py. выкл -> ордера как раньше
         builder_enabled=bool(getattr(cfg, "builder", {}).get("enabled")),
+        # выключать DEX abstraction перед торговлей (по умолчанию выкл — режим аккаунта не трогаем)
+        disable_abstraction=bool(getattr(cfg, "disable_dex_abstraction", False)),
     )
 
     summary = (f"UETH {res.get('ueth_before')} → {res.get('ueth_after')} | "

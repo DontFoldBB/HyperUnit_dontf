@@ -29,6 +29,10 @@
   // Весь трафик аккаунта (Unit/Hyperliquid/RPC) идёт через его прокси; Bitget по умолчанию НЕ через прокси (его API на IP-whitelist).
   "proxy_bitget": false,         // true = пускать и Bitget через прокси аккаунта (тогда добавь IP прокси в whitelist Bitget либо отключи whitelist)
 
+  // Выключать DEX abstraction перед торговлей (стандартный режим маржи). По умолчанию false — режим аккаунта НЕ трогаем (unified; HIP-3 фондится через перп-баланс + cross).
+  // true — ТОЛЬКО если переводы USDC падают 'Cannot transfer with DEX abstraction enabled': бот сам выключит abstraction и будет фондить HIP-3 напрямую (spot→DEX, isolated).
+  "disable_dex_abstraction": false,
+
   // Builder-комиссия Hyperliquid: маленький % с каждого ордера. Адрес и ставка вшиты в код — здесь только вкл/выкл.
   "builder_codes": true,         // true = включить builder-комиссию
 
