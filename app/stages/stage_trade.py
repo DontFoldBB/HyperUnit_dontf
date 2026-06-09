@@ -53,6 +53,8 @@ def run(cfg, live):
         builder_enabled=bool(getattr(cfg, "builder", {}).get("enabled")),
         # выключать DEX abstraction перед торговлей (по умолчанию выкл — режим аккаунта не трогаем)
         disable_abstraction=bool(getattr(cfg, "disable_dex_abstraction", False)),
+        # лимитные ордера для перпов/HIP-3 (тумблер config/меню; спот всегда лимиткой)
+        limit_orders=bool(getattr(cfg, "limit_orders", False)),
     )
 
     summary = (f"UETH {res.get('ueth_before')} → {res.get('ueth_after')} | "

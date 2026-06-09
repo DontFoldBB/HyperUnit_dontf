@@ -45,6 +45,10 @@ ETH_TOKEN = "UETH"
 SPOT_SLIPPAGE = 0.01
 PERP_SLIPPAGE = 0.05
 MIN_ORDER = 10.0
+
+# Лимитки для перпов/HIP-3 (вкл из config limit_orders). Спот всегда лимиткой, независимо.
+# Ставится в run() на каждый прогон; do_open/do_close читают его. Дефолт False = маркет (как было).
+_LIMIT_MODE = False
 MAX_TRADES = 5000            # предохранитель от бесконечного цикла
 MAX_EMPTY = 6                # стоп, если подряд столько сделок не открылось (мало средств/нет цены)
 RESERVE_USDC = 1.0          # оставлять на споте при финальной покупке (нужно ~1 USDC
@@ -325,6 +329,10 @@ def do_open(ex, info, addr, coin, side, per_margin, lev, cross, specs, live, row
         ex.update_leverage(eff, coin, is_cross=cross)
     except Exception as e:
         print(f"    ! плечо {coin}: {e}")
+    if _LIMIT_MODE:
+        # открываем лимиткой с переустановкой (дешевле маркета); частичное исполнение допустимо
+        return _limit_position(ex, info, addr, coin, side == "long", sz, False,
+                               int(spec.get("szDecimals", 2)), rows, "Открытие")
     r = ex.market_open(coin, side == "long", sz, px=px, slippage=PERP_SLIPPAGE)
     vol, fpx = fill_info(r)
     log_event(rows, "Открытие", coin, side, sz, fpx or px, "ок" if is_ok(r) else f"ОШИБКА {r}")
@@ -336,6 +344,23 @@ def do_close(ex, info, addr, coin, specs, live, rows, plan_notional) -> float:
         px = get_mid(info, coin)
         log_event(rows, "Закрытие", coin, "close", (plan_notional / px if px else 0), px, "ТЕСТ")
         return plan_notional
+    if _LIMIT_MODE:
+        dex = coin.split(":")[0] if ":" in coin else ""
+        pos = next((p for p in open_positions(info, addr, dex) if p.get("coin") == coin), None)
+        szi = float(pos.get("szi", 0) or 0) if pos else 0.0
+        vol = 0.0
+        if szi != 0:
+            # закрываем лимиткой (шорт → buy, лонг → sell), reduce_only
+            vol = _limit_position(ex, info, addr, coin, szi < 0, abs(szi), True,
+                                  int(specs.get(coin, {}).get("szDecimals", 2)), rows, "Закрытие")
+        # СТРАХОВКА: позиция не закрылась полностью лимиткой → добиваем маркетом (НЕ оставляем открытой)
+        if _abs_pos(info, addr, coin) > 0:
+            r = ex.market_close(coin, slippage=PERP_SLIPPAGE)
+            sv, fpx = fill_info(r)
+            vol += sv
+            log_event(rows, "Закрытие (маркет-добор)", coin, "close", (sv / fpx if fpx else 0), fpx,
+                      "ок" if (r is None or is_ok(r)) else f"ОШИБКА {r}")
+        return vol
     r = ex.market_close(coin, slippage=PERP_SLIPPAGE)
     vol, fpx = fill_info(r)
     log_event(rows, "Закрытие", coin, "close", (vol / fpx if fpx else 0), fpx,
@@ -499,10 +524,74 @@ def spot_limit_fill(ex, info, addr, coin, is_buy, need_fn, szdec, rows, label, o
     return vol
 
 
+def _abs_pos(info, addr, coin):
+    """abs(размер позиции) по coin (перп или HIP-3-DEX). 0, если позиции нет."""
+    dex = coin.split(":")[0] if ":" in coin else ""
+    for p in open_positions(info, addr, dex):
+        if p.get("coin") == coin:
+            return abs(float(p.get("szi", 0) or 0))
+    return 0.0
+
+
+def _limit_position(ex, info, addr, coin, is_buy, target_sz, reduce_only, szdec, rows, label,
+                    wait_s=10.0, repegs=6, final_cross=0.004):
+    """Открыть/закрыть позицию (перп/HIP-3) ЛИМИТКОЙ по миду с переустановкой каждые wait_s сек.
+
+    target_sz — сколько монет набрать (открытие) или сбросить (закрытие, reduce_only=True).
+    Исполнение меряем по изменению размера позиции — частичные учитываются сами. Не исполнилось
+    за wait_s → снимаем и ставим на свежий мид. Последняя попытка чуть крестит спред (final_cross)
+    — добивает по хорошей цене вместо маркета с 5% слиппеджа. Возвращает исполненный объём ($).
+    Полную гарантию (особенно закрытия) обеспечивает вызывающий маркет-добором."""
+    done = 0.0
+    vol = 0.0
+    for attempt in range(int(repegs) + 1):
+        mid = get_mid(info, coin)
+        if not mid:
+            break
+        sz = int(max(0.0, target_sz - done) * 10 ** szdec) / 10 ** szdec
+        if sz <= 0 or sz * mid < MIN_ORDER:
+            break
+        cross = final_cross if attempt == repegs else 0.0
+        px = _round_px(ex, coin, is_buy, mid * (1 + cross) if is_buy else mid * (1 - cross))
+        before = _abs_pos(info, addr, coin)
+        try:
+            r = ex.order(coin, is_buy, sz, px, {"limit": {"tif": "Gtc"}}, reduce_only=reduce_only)
+        except Exception as e:
+            print(f"    ! лимитка {label} {coin}: {e}")
+            break
+        if not is_ok(r):
+            log_event(rows, label, coin, ("buy" if is_buy else "sell"), sz, px, f"ОШИБКА {r}")
+            break
+        oid = _resting_oid(r)
+        if oid is not None:
+            waited, ok_done = 0.0, False
+            while waited < wait_s:
+                time.sleep(1.0)
+                waited += 1.0
+                if _order_done(info, addr, oid):
+                    ok_done = True
+                    break
+            if not ok_done:
+                try:
+                    ex.cancel(coin, oid)
+                except Exception:
+                    pass
+        time.sleep(1.0)  # дать позиции/ордеру осесть
+        filled = abs(_abs_pos(info, addr, coin) - before)
+        if filled > 0:
+            done += filled
+            vol += filled * px
+            log_event(rows, label, coin, ("buy" if is_buy else "sell"), filled, px, "ок")
+    _cancel_coin_orders(ex, info, addr, coin)
+    return vol
+
+
 # ----------------------------- круг ----------------------------- #
 def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, perp_arg,
         pct, lev, target_hip3, target_perp, hold, gap, live, log_csv=True, reserve_usdc=RESERVE_USDC,
-        jitter=0.0, random_pick=False, builder=None, manual_mode=False):
+        jitter=0.0, random_pick=False, builder=None, manual_mode=False, limit_orders=False):
+    global _LIMIT_MODE
+    _LIMIT_MODE = bool(limit_orders)
     rows: List[List[Any]] = []
     # builder-комиссия: подставить builder во ВСЕ ордера этого аккаунта (если включена).
     # Выключено (builder=None) -> обёрток нет, поведение 1-в-1 прежнее.
@@ -898,7 +987,8 @@ def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_co
                log_csv: bool = True, reserve_usdc: float = RESERVE_USDC,
                hip3_count: int = None, shuffle: bool = False,
                size_jitter: float = 0.0, random_pick: bool = False,
-               builder_enabled: bool = False, disable_abstraction: bool = False) -> dict:
+               builder_enabled: bool = False, disable_abstraction: bool = False,
+               limit_orders: bool = False) -> dict:
     """
     Прогнать круг программно (без вопросов в консоли). Возвращает dict с результатом
     (см. ключи в конце run(): ok, volume, positions_left, spent_usd, ...).
@@ -1000,7 +1090,7 @@ def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_co
                float(pct), lev_use, float(target_hip3), float(target_perp), hold_minutes,
                gap_minutes, bool(live), log_csv=log_csv, reserve_usdc=float(reserve_usdc),
                jitter=float(size_jitter), random_pick=bool(random_pick), builder=builder,
-               manual_mode=bool(disable_abstraction))
+               manual_mode=bool(disable_abstraction), limit_orders=bool(limit_orders))
 
 
 # ----------------------------- main (интерактив) ----------------------------- #

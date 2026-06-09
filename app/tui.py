@@ -161,6 +161,12 @@ def _rows(cfg):
     sname = "Пропускать уже сделанные (из output/done_accounts.txt)"
     rows.append(("opt:skipdone", f"{sbox_c} {CYAN}{sname}{RESET}", f"{sbox_p} {sname}"))
 
+    lim = getattr(cfg, "limit_orders", False)
+    lbox_c = f"{GREEN}[✓]{RESET}" if lim else f"{GREY}[ ]{RESET}"
+    lbox_p = "[✓]" if lim else "[ ]"
+    lname = "Лимитки (перпы/HIP-3 лимит-ордерами — дешевле маркета)"
+    rows.append(("opt:limit", f"{lbox_c} {CYAN}{lname}{RESET}", f"{lbox_p} {lname}"))
+
     cyc = _cycle_str(cfg)
     rows.append(("run", f"    {GREEN}{BOLD}▶ ЗАПУСТИТЬ по wallets.xlsx{RESET}  ({cyc})",
                  f"    ▶ ЗАПУСТИТЬ по wallets.xlsx  ({cyc})"))
@@ -226,6 +232,9 @@ def run_menu(cfg, args, do_run, persist):
                     persist(cfg)
                 elif kind == "opt:skipdone":
                     cfg.skip_done_accounts = not getattr(cfg, "skip_done_accounts", True)
+                    persist(cfg)
+                elif kind == "opt:limit":
+                    cfg.limit_orders = not getattr(cfg, "limit_orders", False)
                     persist(cfg)
                 elif kind == "run":
                     _exit_fullscreen()          # вывод прогона — на основном экране (останется в истории)

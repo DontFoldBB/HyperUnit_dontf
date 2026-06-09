@@ -165,6 +165,8 @@ class Config:
         self.wallets_file = (js.get("batch_wallets_file") or "").strip()
         # перемешивать ли порядок кошельков из wallets.xlsx на каждом запуске
         self.randomize_wallets = bool(js.get("randomize_wallets", False))
+        # лимитные ордера для перпов/HIP-3 (спот всегда лимиткой). По умолчанию выкл = маркет.
+        self.limit_orders = bool(js.get("limit_orders", False))
         # резюме после обрыва: пропускать аккаунты, уже записанные в output/done_accounts.txt
         self.skip_done_accounts = bool(js.get("skip_done_accounts", True))
         # прокси аккаунта (из wallets.xlsx, столбец C) — на каждый кошелёк свой; "" = основной IP
@@ -340,5 +342,7 @@ def save_toggles(cfg, path=CONFIG_PATH):
                                 getattr(cfg, "randomize_wallets", False))
     text = _set_or_add_top_bool(text, "skip_done_accounts",
                                 getattr(cfg, "skip_done_accounts", True))
+    text = _set_or_add_top_bool(text, "limit_orders",
+                                getattr(cfg, "limit_orders", False))
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)
