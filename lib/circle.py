@@ -45,6 +45,10 @@ ETH_TOKEN = "UETH"
 SPOT_SLIPPAGE = 0.01
 PERP_SLIPPAGE = 0.05
 MIN_ORDER = 10.0
+# Гард рыночных часов / ликвидности: HIP-3 акции/товары (NVDA, SP500, нефть, золото) на
+# закрытом рынке (ночь/выходные) дают пустой стакан или дикий спред → market-добор съест
+# 5% слиппеджа. Перед открытием проверяем книгу; шире порога → пропуск актива в этом круге.
+MAX_SPREAD_PCT = 0.01       # 1%: норм. открытый рынок < 0.5%; закрытый/халт — пусто или много-%
 
 # Лимитки для перпов/HIP-3 (вкл из config limit_orders). Спот всегда лимиткой, независимо.
 # Ставится в run() на каждый прогон; do_open/do_close читают его. Дефолт False = маркет (как было).
@@ -168,6 +172,25 @@ def get_mid(info, coin: str) -> float:
         return float(info.all_mids(dex)[coin])
     except Exception:
         return 0.0
+
+
+def _book_tradable(info, coin, max_spread=MAX_SPREAD_PCT):
+    """True, если по coin есть нормальный двусторонний стакан с приемлемым спредом.
+    Закрытый рынок HIP-3 (акции/товары ночью/в выходные) — пустой стакан или дикий спред → False
+    (пропускаем актив: иначе лимитка не исполнится, а маркет-добор нальёт по жуткой цене).
+    Не смогли прочитать книгу → True (не блокируем торговлю из-за разовой ошибки чтения)."""
+    try:
+        lv = (info.l2_snapshot(coin) or {}).get("levels") or []
+        bids = lv[0] if len(lv) > 0 else []
+        asks = lv[1] if len(lv) > 1 else []
+        if not bids or not asks:
+            return False
+        bid = float(bids[0]["px"]); ask = float(asks[0]["px"])
+        if bid <= 0 or ask <= 0 or ask < bid:
+            return False
+        return (ask - bid) / ((ask + bid) / 2.0) <= max_spread
+    except Exception:
+        return True
 
 
 def resolve_spot_coin(info, token: str) -> Tuple[str, int]:
@@ -321,6 +344,9 @@ def do_open(ex, info, addr, coin, side, per_margin, lev, cross, specs, live, row
     sz = round(notional / px, int(spec.get("szDecimals", 2))) if px else 0
     if px == 0 or notional < MIN_ORDER or sz <= 0:
         print(f"    X {coin}: позиция мала (<{fmt(MIN_ORDER)}) или нет цены - пропуск")
+        return 0.0
+    if live and not _book_tradable(info, coin):
+        print(_paint(f"    ⏸ {coin}: рынок закрыт / спред широкий — пропуск", "yellow"))
         return 0.0
     if not live:
         log_event(rows, "Открытие", coin, side, sz, px, "ТЕСТ")
@@ -586,10 +612,55 @@ def _limit_position(ex, info, addr, coin, is_buy, target_sz, reduce_only, szdec,
     return vol
 
 
+# ----------------------- продолжение (recover хвостов) ----------------------- #
+def _close_with_retry(ex, info, addr, coin, rows, tries=3):
+    """Закрыть позицию по coin маркетом с повтором, пока размер не станет 0 (или попытки кончатся)."""
+    for _ in range(int(tries)):
+        if _abs_pos(info, addr, coin) <= 0:
+            return True
+        try:
+            r = ex.market_close(coin, slippage=0.08)
+            vol, fpx = fill_info(r)
+            log_event(rows, "Recover-закрытие", coin, "close", (vol / fpx if fpx else 0), fpx,
+                      "ок" if (r is None or is_ok(r)) else f"ОШИБКА {r}")
+        except Exception as e:
+            print(f"    ! recover close {coin}: {e}")
+        time.sleep(1.2)
+    return _abs_pos(info, addr, coin) <= 0
+
+
+def preflight_recover(ex, info, addr, live, rows):
+    """«Продолжить»: подобрать хвосты прошлого (упавшего) прогона ПЕРЕД новым кругом —
+    закрыть открытые позиции (perp + HIP-3) и смести застрявший USDC с perp/DEX на спот.
+    Идемпотентно: на чистом аккаунте просто ничего не делает. Только live."""
+    if not live:
+        return
+    print(_paint("\n  ⟲ Продолжение: проверяю хвосты прошлого прогона…", "cyan", "bold"))
+    found = False
+    for dex in (DEX, ""):                      # сначала закрыть позиции (освобождают залог)
+        for pos in open_positions(info, addr, dex):
+            coin = pos.get("coin")
+            found = True
+            print(_paint(f"    ⟲ закрываю остаток {coin}", "yellow"))
+            _close_with_retry(ex, info, addr, coin, rows)
+    for src in (DEX, ""):                       # затем смести освободившийся USDC на спот
+        bal = acct_usdc(info, addr, src)
+        if bal >= 0.5:
+            found = True
+            print(_paint(f"    ⟲ возвращаю {fmt(bal)} USDC {loc(src)}->spot", "yellow"))
+            move_usdc(ex, info, addr, src, "spot", bal, live, rows)
+    if found:
+        time.sleep(2)
+        print(_paint("    ⟲ хвосты подобраны — продолжаю круг", "green"))
+    else:
+        print("    ⟲ чисто, хвостов нет")
+
+
 # ----------------------------- круг ----------------------------- #
 def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, perp_arg,
         pct, lev, target_hip3, target_perp, hold, gap, live, log_csv=True, reserve_usdc=RESERVE_USDC,
-        jitter=0.0, random_pick=False, builder=None, manual_mode=False, limit_orders=False):
+        jitter=0.0, random_pick=False, builder=None, manual_mode=False, limit_orders=False,
+        recover=False):
     global _LIMIT_MODE
     _LIMIT_MODE = bool(limit_orders)
     rows: List[List[Any]] = []
@@ -599,6 +670,8 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
         _bo, _bc = ex.market_open, ex.market_close
         ex.market_open = lambda *a, **k: _bo(*a, **{"builder": builder, **k})
         ex.market_close = lambda *a, **k: _bc(*a, **{"builder": builder, **k})
+    if recover:                                # «продолжить»: подобрать хвосты прошлого прогона
+        preflight_recover(ex, info, addr, live, rows)
     ueth_before = spot_free(info, addr, ETH_TOKEN)
     usdc_before = spot_free(info, addr, "USDC")
     spot_px = get_mid(info, spot_coin)
@@ -988,7 +1061,7 @@ def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_co
                hip3_count: int = None, shuffle: bool = False,
                size_jitter: float = 0.0, random_pick: bool = False,
                builder_enabled: bool = False, disable_abstraction: bool = False,
-               limit_orders: bool = False) -> dict:
+               limit_orders: bool = False, recover: bool = False) -> dict:
     """
     Прогнать круг программно (без вопросов в консоли). Возвращает dict с результатом
     (см. ключи в конце run(): ok, volume, positions_left, spent_usd, ...).
@@ -1090,7 +1163,8 @@ def run_circle(private_key: str, hip3_assets=None, perp: str = "none", single_co
                float(pct), lev_use, float(target_hip3), float(target_perp), hold_minutes,
                gap_minutes, bool(live), log_csv=log_csv, reserve_usdc=float(reserve_usdc),
                jitter=float(size_jitter), random_pick=bool(random_pick), builder=builder,
-               manual_mode=bool(disable_abstraction), limit_orders=bool(limit_orders))
+               manual_mode=bool(disable_abstraction), limit_orders=bool(limit_orders),
+               recover=bool(recover))
 
 
 # ----------------------------- main (интерактив) ----------------------------- #

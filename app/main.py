@@ -664,6 +664,8 @@ def menu_loop(cfg, args):
         print(f"    d) {skp}  Пропускать уже сделанные (из output/done_accounts.txt)")
         lim = "[✓ ВКЛ ]" if getattr(cfg, "limit_orders", False) else "[✗ выкл]"
         print(f"    l) {lim}  Лимитки (перпы/HIP-3 лимит-ордерами — дешевле маркета)")
+        rec = "[✓ ВКЛ ]" if getattr(cfg, "recover_tails", False) else "[✗ выкл]"
+        print(f"    c) {rec}  Продолжить прошлый прогон (подобрать позиции/USDC)")
         print(f"    s) ▶ ЗАПУСТИТЬ по wallets.xlsx:  {cyc_str}")
         print("    0) Выход")
         choice = input("  Выбор: ").strip().lower()
@@ -688,11 +690,15 @@ def menu_loop(cfg, args):
             cfg.limit_orders = not getattr(cfg, "limit_orders", False)
             _persist(cfg)
             continue
+        if choice == "c":                              # вкл/выкл «продолжить» (recover хвостов)
+            cfg.recover_tails = not getattr(cfg, "recover_tails", False)
+            _persist(cfg)
+            continue
         if choice in ("s", "go", "run", "запуск", "старт"):
             _do_run(cfg, args)
             input("\n  Enter — вернуться в меню… ")
             continue
-        print("  Не понял. Цифры 1-5 — вкл/выкл, r — случайный порядок, d — пропуск сделанных, l — лимитки, s — запуск, 0 — выход.")
+        print("  Не понял. Цифры 1-5 — вкл/выкл, r — случайный порядок, d — пропуск сделанных, l — лимитки, c — продолжить, s — запуск, 0 — выход.")
 
 
 # --------------------------------------------------------------------------- #
