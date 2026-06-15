@@ -84,6 +84,8 @@ Copy **`config\config.example.json`** → **`config\config.json`**, then open it
 - `randomize_wallets` — `true` shuffles the wallet order on each run (`false` = order from the file); can also be toggled in the menu;
 - `skip_done_accounts` — `true` skips accounts where **all enabled stages passed** (logged to `output/done_accounts.txt`) so you can resume after an interruption. If any enabled stage failed, the account goes to `output/failed_accounts.txt` and is retried on the next run. Delete `done_accounts.txt` to run everyone from scratch;
 - `builder_codes` — **builder fee**: a small fixed fee (~0.01%) per Hyperliquid order goes to the project's builder address. **Enabled in the shipped config** — set `builder_codes: false` to turn it off. Only the on/off toggle is in the config; the address and rate are fixed in the code;
+- `recover_tails` — **"Continue"** (also a menu toggle, key `c`): before trading it picks up tails of a crashed previous run — closes any leftover positions (perps + HIP-3) and sweeps stray USDC from the perp/DEX accounts back to spot. Idempotent (does nothing on a clean account); **off by default**;
+- **market-hours guard** (automatic, no config key): before opening a position the bot checks the L2 order book; if it's empty or the spread is too wide — a HIP-3 stock/commodity whose market is closed at night/on weekends — the asset is skipped for that round, so a market fallback never fills at a terrible price;
 - `advanced` — wait timeouts and pauses between steps/wallets.
 
 ---
