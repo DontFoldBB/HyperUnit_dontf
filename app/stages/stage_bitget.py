@@ -51,19 +51,26 @@ def _need_balance_err(spec):
 
 def _submit_with_retry(address, amount, unlock_wait_min, on_other_error,
                        sleep_fn=time.sleep, now_fn=time.time):
-    """Отправить вывод с Bitget, переживая лок свежего депозита.
+    """Отправить вывод с Bitget, переживая две частые осечки:
       • 13008 «withdrawable amount: 0» — деньги ещё НЕ разморожены для вывода (возврат с прошлого
         кошелька только зачислился): ждём и повторяем САМИ до unlock_wait_min минут (это не вайтлист).
-      • прочие ошибки Bitget — отдаём on_other_error(e) -> 'retry' | 'skip'.
+      • 40938 «not in addressBook» — вайтлист Bitget часто хранит адрес в НИЖНЕМ регистре, а из
+        приватника адрес выходит checksummed (смешанный регистр). Прежде чем винить вайтлист,
+        повторяем ТЕМ ЖЕ адресом в lower() — это тот же адрес, ничего не ломает.
+    Прочие ошибки (и реальное отсутствие в вайтлисте) — отдаём on_other_error(e) -> 'retry' | 'skip'.
     Возвращает res (dict) или None (пропустить кошелёк). sleep_fn/now_fn вынесены для тестов."""
     deadline = now_fn() + max(0.0, float(unlock_wait_min)) * 60
     last_note = 0.0
+    addr = address
+    tried_lower = False
     while True:
         try:
-            return bg.submit_withdrawal(address, amount)
+            return bg.submit_withdrawal(addr, amount)
         except bg.BitgetError as e:
             msg = str(e)
-            if ("13008" in msg or "withdrawable amount" in msg.lower()) and now_fn() < deadline:
+            mlow = msg.lower()
+            # 13008 — деньги ещё залочены для вывода: ждём разморозки и повторяем
+            if ("13008" in msg or "withdrawable amount" in mlow) and now_fn() < deadline:
                 t = now_fn()
                 if t - last_note >= 60:                 # не спамим: заметка раз в ~минуту
                     left = int(deadline - t)
@@ -72,9 +79,19 @@ def _submit_with_retry(address, amount, unlock_wait_min, on_other_error,
                     last_note = t
                 sleep_fn(30)
                 continue
+            # 40938 — адрес «не в вайтлисте»: сперва пробуем ТОТ ЖЕ адрес в нижнем регистре
+            # (вайтлист часто записан lower-case, а submit шлёт checksummed → мнимое «нет в вайтлисте»)
+            if (("40938" in msg or "addressbook" in mlow)
+                    and not tried_lower and address.lower() != address):
+                tried_lower = True
+                addr = address.lower()
+                print(C.dim("    ↻ адрес не найден в вайтлисте — пробую тот же адрес в нижнем регистре…"))
+                continue
             if on_other_error(e) == "skip":
                 return None
-            # 'retry' — повторить отправку
+            # 'retry' (адрес добавили в вайтлист) — пробуем заново: снова checksummed → lower()
+            addr = address
+            tried_lower = False
 
 
 def run(cfg, live):
