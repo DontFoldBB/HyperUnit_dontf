@@ -665,6 +665,17 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
         print("    X UETH мало (<$10)")
     step_pause(gap, "перед торговлей", live)
 
+    # С ВЫКЛЮЧЕННОЙ DEX abstraction (manual) выручка от продажи UETH может осесть на ПЕРП-аккаунте
+    # (HL переносит коллатераль при смене режима маржи) — тогда на споте $0 и весь круг пропускается.
+    # Сметём свободный USDC с перпа и xyz-dex обратно на спот, чтобы бюджет и ручной фондинг шли с него.
+    if live and manual_mode:
+        for src in ("", DEX):
+            bal = acct_usdc(info, addr, src)
+            if bal >= 0.5:
+                print(_paint(f"    ↩ {fmt(bal)} USDC {loc(src)}->spot (консолидация после смены режима маржи)", "grey"))
+                move_usdc(ex, info, addr, src, "spot", bal, live, rows)
+        time.sleep(2)
+
     budget = spot_free(info, addr, "USDC") if live else ueth_before * spot_px + spot_free(info, addr, "USDC")
     requested = budget * pct / 100.0
     base_margin = min(requested, budget * 0.97)     # вся маржа на сделку; ≤97% бюджета — запас на комиссии
