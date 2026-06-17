@@ -63,6 +63,7 @@ def _submit_with_retry(address, amount, unlock_wait_min, on_other_error,
     last_note = 0.0
     addr = address
     tried_lower = False
+    rate_tries = 0
     while True:
         try:
             return bg.submit_withdrawal(addr, amount)
@@ -79,6 +80,13 @@ def _submit_with_retry(address, amount, unlock_wait_min, on_other_error,
                     last_note = t
                 sleep_fn(30)
                 continue
+            # 429 Too Many Requests — рейт-лимит Bitget (НЕ вайтлист!): backoff и авто-повтор
+            if ("429" in msg or "too many requests" in mlow) and rate_tries < 8:
+                wait = min(60, 5 * (2 ** rate_tries))
+                rate_tries += 1
+                print(C.warn(f"  ⏳ Bitget rate-limit (429) — пауза {wait}с и повтор… (попытка {rate_tries}/8)"))
+                sleep_fn(wait)
+                continue
             # 40938 — адрес «не в вайтлисте»: сперва пробуем ТОТ ЖЕ адрес в нижнем регистре
             # (вайтлист часто записан lower-case, а submit шлёт checksummed → мнимое «нет в вайтлисте»)
             if (("40938" in msg or "addressbook" in mlow)
@@ -92,6 +100,7 @@ def _submit_with_retry(address, amount, unlock_wait_min, on_other_error,
             # 'retry' (адрес добавили в вайтлист) — пробуем заново: снова checksummed → lower()
             addr = address
             tried_lower = False
+            rate_tries = 0
 
 
 def run(cfg, live):
@@ -194,11 +203,19 @@ def run(cfg, live):
 
     def _on_other_error(e):
         last_err["e"] = e
+        msg = str(e); mlow = msg.lower()
         print(C.err(f"\n  ✗ Bitget отклонил вывод: {e}"))
-        print(C.warn(f"    Частая причина: адрес {address} НЕ в вайтлисте вывода Bitget."))
-        print(C.dim("    Добавь его: Bitget → Вывод → Управление адресами (whitelist), сеть ETH (ERC-20)."))
+        # подсказку про вайтлист показываем ТОЛЬКО если ошибка реально про адрес/адресную книгу —
+        # иначе (баланс, лимиты, ключи, сеть) не вводим в заблуждение ложной причиной.
+        looks_whitelist = ("40938" in msg or "addressbook" in mlow or "address book" in mlow
+                           or "whitelist" in mlow or "not in" in mlow or "address" in mlow)
+        if looks_whitelist:
+            print(C.warn(f"    Похоже на вайтлист: адрес {address} не в адресной книге вывода Bitget."))
+            print(C.dim("    Добавь его: Bitget → Вывод → Управление адресами (whitelist), сеть ETH (ERC-20)."))
+        else:
+            print(C.warn("    Это НЕ вайтлист — причина в тексте ошибки выше (баланс / лимиты / ключи / сеть)."))
         try:
-            ans = input(C.bold("    [Enter] — добавил, повторить   |   [s] — пропустить этот кошелёк: ")).strip().lower()
+            ans = input(C.bold("    [Enter] — повторить   |   [s] — пропустить этот кошелёк: ")).strip().lower()
         except EOFError:
             ans = "s"
         if ans in ("s", "skip", "п", "пропуск", "пропустить"):
