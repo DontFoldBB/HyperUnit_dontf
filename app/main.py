@@ -509,6 +509,8 @@ def _run_wallets(cfg, args, keys):
         try:
             moved = bitget_api.sweep_all_subs_to_main("ETH", log=lambda m: print(C.dim(m)))
             print(C.ok(f"  Переведено на мейн: {moved} ETH") if moved > 0 else C.dim("  на субаккаунтах пусто"))
+        except KeyboardInterrupt:
+            print(C.warn("  ⏸ свод субакков прерван (Ctrl+C) — продолжаю запуск."))
         except Exception as e:
             print(C.warn(f"  ⚠ проверка субакков не удалась: {e}"))
     accounts = []
@@ -559,6 +561,8 @@ def _run_wallets(cfg, args, keys):
         try:
             moved = bitget_api.sweep_all_subs_to_main("ETH", log=lambda m: print(C.dim(m)))
             print(C.ok(f"  Переведено на мейн: {moved} ETH") if moved > 0 else C.dim("  на субакках пусто"))
+        except KeyboardInterrupt:
+            print(C.warn("  ⏸ свод субакков прерван (Ctrl+C)."))
         except Exception as e:
             print(C.warn(f"  ⚠ перевод с субакков не удался: {e}"))
     print_accounts_summary(accounts)

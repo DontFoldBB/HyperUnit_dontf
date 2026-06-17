@@ -13,8 +13,8 @@ import paths  # noqa: F401
 import withdraw_eth as bg
 
 # Сколько ждать разморозки свежего депозита при своде субакк→мейн, сек (Bitget лочит
-# поступившие монеты на время). 0 = без лимита. Ctrl+C прерывает ожидание.
-SWEEP_TIMEOUT_S = 1200          # ~20 мин на аккаунт; финальный свод — короче
+# поступившие монеты на время). 0 = БЕЗ ЛИМИТА: ждём, ПОКА не разморозится. Ctrl+C прерывает.
+SWEEP_TIMEOUT_S = 0             # ждать до разморозки (Bitget держит депозит обычно ~10-20 мин)
 
 
 def use_keys(cfg):
@@ -115,9 +115,9 @@ def sweep_sub_to_main(coin, uid, muid=None, first_delay=0, poll_s=30, timeout_s=
         time.sleep(poll_s)
 
 
-def sweep_all_subs_to_main(coin="ETH", poll_s=20, timeout_s=300, log=print):
-    """Свести весь ETH со всех субаккаунтов на мейн (с ожиданием разморозки, но
-    финальный свод ждёт меньше — это уборка в конце). -> сколько всего переведено (Decimal)."""
+def sweep_all_subs_to_main(coin="ETH", poll_s=20, timeout_s=0, log=print):
+    """Свести весь ETH со всех субаккаунтов на мейн, ДОЖИДАЯСЬ разморозки каждого
+    (timeout_s=0 — без лимита, ждём пока не разморозится; Ctrl+C прерывает). -> Decimal."""
     try:
         muid = main_uid()
         subs = sub_eth_balances(coin)
