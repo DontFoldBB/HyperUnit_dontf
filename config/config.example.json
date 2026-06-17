@@ -79,6 +79,7 @@
     "module_gap_sec": [15, 30],         // пауза между шагами/кошельками, сек (как человек). [мин,макс] или число; 0 = без
     "bitget_wait_arrival": true,        // ждать прихода ETH на кошелёк после вывода с Bitget
     "bitget_wait_timeout_sec": 900,     // макс. ожидание прихода с Bitget, сек
+    "bitget_withdraw_unlock_wait_min": 30, // вывод с Bitget: ждать разморозки свежего депозита для вывода, мин (деньги с прошлого кошелька зачислились, но залочены) — авто-повтор при code 13008
     "deposit_wait_credit": true,        // ждать зачисления UETH на Hyperliquid
     "deposit_wait_timeout_min": 0,      // 0 = ждать без лимита, пока не придёт
     "trade_reserve_usdc": 1.0,          // оставить USDC на споте (~1 нужен для вывода через Unit)

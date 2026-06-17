@@ -49,6 +49,34 @@ def _need_balance_err(spec):
             "spent": {}, "raw": {}}
 
 
+def _submit_with_retry(address, amount, unlock_wait_min, on_other_error,
+                       sleep_fn=time.sleep, now_fn=time.time):
+    """Отправить вывод с Bitget, переживая лок свежего депозита.
+      • 13008 «withdrawable amount: 0» — деньги ещё НЕ разморожены для вывода (возврат с прошлого
+        кошелька только зачислился): ждём и повторяем САМИ до unlock_wait_min минут (это не вайтлист).
+      • прочие ошибки Bitget — отдаём on_other_error(e) -> 'retry' | 'skip'.
+    Возвращает res (dict) или None (пропустить кошелёк). sleep_fn/now_fn вынесены для тестов."""
+    deadline = now_fn() + max(0.0, float(unlock_wait_min)) * 60
+    last_note = 0.0
+    while True:
+        try:
+            return bg.submit_withdrawal(address, amount)
+        except bg.BitgetError as e:
+            msg = str(e)
+            if ("13008" in msg or "withdrawable amount" in msg.lower()) and now_fn() < deadline:
+                t = now_fn()
+                if t - last_note >= 60:                 # не спамим: заметка раз в ~минуту
+                    left = int(deadline - t)
+                    print(C.warn(f"  ⏳ Bitget: средства ещё залочены для вывода (свежий депозит с прошлого "
+                                 f"кошелька зачислился, но не разморожен) — жду и повторяю… осталось ~{max(1, left // 60)} мин"))
+                    last_note = t
+                sleep_fn(30)
+                continue
+            if on_other_error(e) == "skip":
+                return None
+            # 'retry' — повторить отправку
+
+
 def run(cfg, live):
     cfg.require_private_key()
     cfg.require_bitget()
@@ -141,26 +169,32 @@ def run(cfg, live):
     if b0 is None:
         print("  (!) RPC недоступен — зачисление не отслежу, но вывод отправлю.")
 
-    # Отправка вывода. Если Bitget отклонил (частая причина — адрес НЕ в вайтлисте
-    # вывода), не падаем молча: спрашиваем — добавить в вайтлист и повторить, либо
-    # пропустить этот кошелёк. (Ctrl+C — прервать весь прогон.)
-    res = None
-    while res is None:
+    # Отправка вывода. Свежий депозит (возврат с прошлого кошелька) Bitget держит ЗАЛОЧЕННЫМ для
+    # вывода → code 13008 «withdrawable amount: 0»: это НЕ вайтлист, а «ещё не разморожено» —
+    # _submit_with_retry сам ждёт и повторяет (до bitget_withdraw_unlock_wait_min мин). На ПРОЧИЕ
+    # ошибки Bitget (реальный вайтлист и т.п.) спрашиваем: добавить и повторить, либо пропустить.
+    last_err = {}
+
+    def _on_other_error(e):
+        last_err["e"] = e
+        print(C.err(f"\n  ✗ Bitget отклонил вывод: {e}"))
+        print(C.warn(f"    Частая причина: адрес {address} НЕ в вайтлисте вывода Bitget."))
+        print(C.dim("    Добавь его: Bitget → Вывод → Управление адресами (whitelist), сеть ETH (ERC-20)."))
         try:
-            res = bg.submit_withdrawal(address, amount)
-        except bg.BitgetError as e:
-            print(C.err(f"\n  ✗ Bitget отклонил вывод: {e}"))
-            print(C.warn(f"    Частая причина: адрес {address} НЕ в вайтлисте вывода Bitget."))
-            print(C.dim("    Добавь его: Bitget → Вывод → Управление адресами (whitelist), сеть ETH (ERC-20)."))
-            try:
-                ans = input(C.bold("    [Enter] — добавил, повторить   |   [s] — пропустить этот кошелёк: ")).strip().lower()
-            except EOFError:
-                ans = "s"
-            if ans in ("s", "skip", "п", "пропуск", "пропустить"):
-                return {"stage": "bitget", "ok": False,
-                        "summary": f"вывод пропущен (адрес не в вайтлисте Bitget?): {e}",
-                        "spent": {}, "raw": {"address": address, "skipped": True}}
-            print(C.dim("    Повторяю вывод…"))
+            ans = input(C.bold("    [Enter] — добавил, повторить   |   [s] — пропустить этот кошелёк: ")).strip().lower()
+        except EOFError:
+            ans = "s"
+        if ans in ("s", "skip", "п", "пропуск", "пропустить"):
+            return "skip"
+        print(C.dim("    Повторяю вывод…"))
+        return "retry"
+
+    res = _submit_with_retry(address, amount,
+                             float(bcfg.get("withdraw_unlock_wait_min", 30) or 0), _on_other_error)
+    if res is None:
+        return {"stage": "bitget", "ok": False,
+                "summary": f"вывод пропущен (адрес не в вайтлисте Bitget?): {last_err.get('e', '')}",
+                "spent": {}, "raw": {"address": address, "skipped": True}}
     order_id = res.get("orderId")
     print(f"  ✓ Заявка отправлена. orderId: {order_id}")
 

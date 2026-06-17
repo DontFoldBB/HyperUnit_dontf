@@ -197,6 +197,9 @@ class Config:
             "amount_eth": js.get("bitget_amount_eth", "0.01"),
             "wait_arrival": bool(adv.get("bitget_wait_arrival", True)),
             "wait_timeout_sec": adv.get("bitget_wait_timeout_sec", 900),
+            # вывод с Bitget: ждать разморозки свежего депозита для вывода, мин (деньги с прошлого
+            # кошелька зачислились, но залочены) — авто-повтор при code 13008 «withdrawable amount: 0».
+            "withdraw_unlock_wait_min": adv.get("bitget_withdraw_unlock_wait_min", 30),
         }
         self.deposit_cfg = {
             "percent": js.get("deposit_percent", 80),
