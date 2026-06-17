@@ -167,12 +167,6 @@ def _rows(cfg):
     lname = "Лимитки (перпы/HIP-3 лимит-ордерами — дешевле маркета)"
     rows.append(("opt:limit", f"{lbox_c} {CYAN}{lname}{RESET}", f"{lbox_p} {lname}"))
 
-    rec = getattr(cfg, "recover_tails", False)
-    cbox_c = f"{GREEN}[✓]{RESET}" if rec else f"{GREY}[ ]{RESET}"
-    cbox_p = "[✓]" if rec else "[ ]"
-    cname = "Продолжить прошлый прогон (подобрать позиции/USDC)"
-    rows.append(("opt:recover", f"{cbox_c} {CYAN}{cname}{RESET}", f"{cbox_p} {cname}"))
-
     cyc = _cycle_str(cfg)
     rows.append(("run", f"    {GREEN}{BOLD}▶ ЗАПУСТИТЬ по wallets.xlsx{RESET}  ({cyc})",
                  f"    ▶ ЗАПУСТИТЬ по wallets.xlsx  ({cyc})"))
@@ -241,9 +235,6 @@ def run_menu(cfg, args, do_run, persist):
                     persist(cfg)
                 elif kind == "opt:limit":
                     cfg.limit_orders = not getattr(cfg, "limit_orders", False)
-                    persist(cfg)
-                elif kind == "opt:recover":
-                    cfg.recover_tails = not getattr(cfg, "recover_tails", False)
                     persist(cfg)
                 elif kind == "run":
                     _exit_fullscreen()          # вывод прогона — на основном экране (останется в истории)

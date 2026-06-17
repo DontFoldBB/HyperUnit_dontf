@@ -167,9 +167,6 @@ class Config:
         self.randomize_wallets = bool(js.get("randomize_wallets", False))
         # лимитные ордера для перпов/HIP-3 (спот всегда лимиткой). По умолчанию выкл = маркет.
         self.limit_orders = bool(js.get("limit_orders", False))
-        # «Продолжить»: перед торговлей подобрать хвосты упавшего прогона — закрыть оставшиеся
-        # позиции (perp+HIP-3) и смести застрявший USDC с perp/DEX на спот. По умолчанию выкл.
-        self.recover_tails = bool(js.get("recover_tails", False))
         # резюме после обрыва: пропускать аккаунты, уже записанные в output/done_accounts.txt
         self.skip_done_accounts = bool(js.get("skip_done_accounts", True))
         # прокси аккаунта (из wallets.xlsx, столбец C) — на каждый кошелёк свой; "" = основной IP
@@ -350,7 +347,5 @@ def save_toggles(cfg, path=CONFIG_PATH):
                                 getattr(cfg, "skip_done_accounts", True))
     text = _set_or_add_top_bool(text, "limit_orders",
                                 getattr(cfg, "limit_orders", False))
-    text = _set_or_add_top_bool(text, "recover_tails",
-                                getattr(cfg, "recover_tails", False))
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)

@@ -55,8 +55,6 @@ def run(cfg, live):
         disable_abstraction=bool(getattr(cfg, "disable_dex_abstraction", False)),
         # лимитные ордера для перпов/HIP-3 (тумблер config/меню; спот всегда лимиткой)
         limit_orders=bool(getattr(cfg, "limit_orders", False)),
-        # «Продолжить»: перед кругом подобрать хвосты упавшего прогона (закрыть позиции/смести USDC)
-        recover=bool(getattr(cfg, "recover_tails", False)),
     )
 
     summary = (f"UETH {res.get('ueth_before')} → {res.get('ueth_after')} | "

@@ -30,17 +30,13 @@
   // Закрытие позиции при неполном исполнении добивается market_close (позиция никогда не остаётся открытой). Тумблер есть и в меню (l).
   "limit_orders": false,         // false = маркет (как было); true = лимитки на перпах/HIP-3
 
-  // «Продолжить»: перед торговлей подобрать хвосты упавшего прогона — закрыть оставшиеся позиции
-  // (perp+HIP-3) и смести застрявший USDC с perp/DEX обратно на спот. Идемпотентно. Тумблер есть и в меню (c).
-  "recover_tails": false,        // true = перед кругом подбирать хвосты прошлого прогона
-
   // Прокси на КАЖДЫЙ аккаунт — в wallets.xlsx, столбец C. Форматы: http://user:pass@host:port | host:port:user:pass | host:port.
   // Весь трафик аккаунта (Unit/Hyperliquid/RPC) идёт через его прокси; Bitget по умолчанию НЕ через прокси (его API на IP-whitelist).
   "proxy_bitget": false,         // true = пускать и Bitget через прокси аккаунта (тогда добавь IP прокси в whitelist Bitget либо отключи whitelist)
 
   // Выключать DEX abstraction перед торговлей (стандартный режим маржи). По умолчанию false — режим аккаунта НЕ трогаем (unified; HIP-3 фондится через перп-баланс + cross).
   // true — ТОЛЬКО если переводы USDC падают 'Cannot transfer with DEX abstraction enabled': бот сам выключит abstraction и будет фондить HIP-3 напрямую (spot→DEX, isolated).
-  "disable_dex_abstraction": false,
+  "disable_dex_abstraction": true,
 
   // Builder-комиссия Hyperliquid: маленький % с каждого ордера. Адрес и ставка вшиты в код — здесь только вкл/выкл.
   "builder_codes": true,         // true = включить builder-комиссию
