@@ -84,6 +84,6 @@
     "withdraw_wait_timeout_min": 30,    // таймаут ожидания вывода, мин (0 = без таймаута)
     "withdraw_poll_sec": 20,            // период проверки статуса вывода, сек
     "bitget_return_wait": true,         // ждать квитанцию Ethereum по возврату на Bitget
-    "bitget_return_wait_credit": true   // ждать зачисления на Bitget (мейн/субакк) и свести субакк→мейн
+    "bitget_return_wait_credit": true   // ждать зачисления на Bitget (мейн/субакк) и перевести субакк→мейн
   }
 }

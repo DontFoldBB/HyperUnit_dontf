@@ -12,7 +12,7 @@ import paths  # noqa: F401
 import colors as C
 from web3 import Web3
 import deposit_eth as bd          # bitget_deposit/deposit_eth.py
-import bitget_api                 # ожидание зачисления на Bitget + свод субакк→мейн
+import bitget_api                 # ожидание зачисления на Bitget + перевод субакк→мейн
 from stage_deposit import _connect  # подключение к ETH RPC (свой/публичный)
 
 
@@ -139,7 +139,7 @@ def run(cfg, live):
         except Exception as e:
             print(C.warn(f"  ⏳ Не дождался квитанции: {e} (транзакция уже отправлена)."))
 
-    # Дождаться зачисления на Bitget (мейн или субакк) и свести субакк → мейн.
+    # Дождаться зачисления на Bitget (мейн или субакк) и перевести субакк → мейн.
     credit = ""
     if status != "failed" and rcfg.get("wait_credit", True) and all(cfg.bitget.values()):
         bitget_api.use_keys(cfg)

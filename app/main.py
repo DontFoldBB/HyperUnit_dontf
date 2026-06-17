@@ -502,7 +502,7 @@ def _run_wallets(cfg, args, keys):
         print(C.dim("  🔀 Порядок кошельков: случайный (этот запуск)"))
     print(C.header(f"\n▶ ЗАПУСК: {len(wallets)} аккаунт(ов) | стадии: "
                    + " → ".join(str(CYCLE_ORDER.index(k) + 1) for k in keys)))
-    # Перед стартом: свести остатки с субаккаунтов Bitget на мейн (вдруг застряли с прошлого прогона).
+    # Перед стартом: перевести остатки с субаккаунтов Bitget на мейн (вдруг застряли с прошлого прогона).
     if all(cfg.bitget.values()):
         print(C.header("\nПроверяю субаккаунты Bitget перед стартом…"))
         bitget_api.use_keys(cfg)
@@ -510,7 +510,7 @@ def _run_wallets(cfg, args, keys):
             moved = bitget_api.sweep_all_subs_to_main("ETH", log=lambda m: print(C.dim(m)))
             print(C.ok(f"  Переведено на мейн: {moved} ETH") if moved > 0 else C.dim("  на субаккаунтах пусто"))
         except KeyboardInterrupt:
-            print(C.warn("  ⏸ свод субакков прерван (Ctrl+C) — продолжаю запуск."))
+            print(C.warn("  ⏸ перевод с субакков прерван (Ctrl+C) — продолжаю запуск."))
         except Exception as e:
             print(C.warn(f"  ⚠ проверка субакков не удалась: {e}"))
     accounts = []
@@ -554,7 +554,7 @@ def _run_wallets(cfg, args, keys):
             if d > 0:
                 print(C.dim(f"\n  ⏳ пауза {d:.0f}с перед следующим аккаунтом…"))
                 time.sleep(d)
-    # финал: свести остатки со всех субаккаунтов Bitget на мейн
+    # финал: перевести остатки со всех субаккаунтов Bitget на мейн
     if all(cfg.bitget.values()):
         print(C.header("\nПеревожу остатки с субаккаунтов Bitget на мейн…"))
         bitget_api.use_keys(cfg)
@@ -562,7 +562,7 @@ def _run_wallets(cfg, args, keys):
             moved = bitget_api.sweep_all_subs_to_main("ETH", log=lambda m: print(C.dim(m)))
             print(C.ok(f"  Переведено на мейн: {moved} ETH") if moved > 0 else C.dim("  на субакках пусто"))
         except KeyboardInterrupt:
-            print(C.warn("  ⏸ свод субакков прерван (Ctrl+C)."))
+            print(C.warn("  ⏸ перевод с субакков прерван (Ctrl+C)."))
         except Exception as e:
             print(C.warn(f"  ⚠ перевод с субакков не удался: {e}"))
     print_accounts_summary(accounts)

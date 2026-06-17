@@ -12,7 +12,7 @@ from decimal import Decimal
 import paths  # noqa: F401
 import withdraw_eth as bg
 
-# Сколько ждать разморозки свежего депозита при своде субакк→мейн, сек (Bitget лочит
+# Сколько ждать разморозки свежего депозита при переводе субакк→мейн, сек (Bitget лочит
 # поступившие монеты на время). 0 = БЕЗ ЛИМИТА: ждём, ПОКА не разморозится. Ctrl+C прерывает.
 SWEEP_TIMEOUT_S = 0             # ждать до разморозки (Bitget держит депозит обычно ~10-20 мин)
 
@@ -116,7 +116,7 @@ def sweep_sub_to_main(coin, uid, muid=None, first_delay=0, poll_s=30, timeout_s=
 
 
 def sweep_all_subs_to_main(coin="ETH", poll_s=20, timeout_s=0, log=print):
-    """Свести весь ETH со всех субаккаунтов на мейн, ДОЖИДАЯСЬ разморозки каждого
+    """Перевести весь ETH со всех субаккаунтов на мейн, ДОЖИДАЯСЬ разморозки каждого
     (timeout_s=0 — без лимита, ждём пока не разморозится; Ctrl+C прерывает). -> Decimal."""
     try:
         muid = main_uid()
