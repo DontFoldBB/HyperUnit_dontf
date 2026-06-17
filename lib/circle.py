@@ -612,6 +612,17 @@ def _limit_position(ex, info, addr, coin, is_buy, target_sz, reduce_only, szdec,
     return vol
 
 
+def _attach_builder(ex, builder):
+    """Подмешать builder-комиссию во ВСЕ ордера аккаунта: market_open/market_close И лимитные
+    ex.order. ВАЖНО: спот всегда идёт лимиткой, а перпы/HIP-3 — лимиткой при limit_orders=true,
+    и все они через ex.order; без обёртки ex.order билдер-fee на них НЕ начисляется (это и был баг).
+    market_open внутри сам зовёт self.order — повторная подстановка того же builder безвредна."""
+    _bo, _bc, _bord = ex.market_open, ex.market_close, ex.order
+    ex.market_open = lambda *a, **k: _bo(*a, **{"builder": builder, **k})
+    ex.market_close = lambda *a, **k: _bc(*a, **{"builder": builder, **k})
+    ex.order = lambda *a, **k: _bord(*a, **{"builder": builder, **k})
+
+
 # ----------------------------- круг ----------------------------- #
 def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, perp_arg,
         pct, lev, target_hip3, target_perp, hold, gap, live, log_csv=True, reserve_usdc=RESERVE_USDC,
@@ -619,12 +630,10 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
     global _LIMIT_MODE
     _LIMIT_MODE = bool(limit_orders)
     rows: List[List[Any]] = []
-    # builder-комиссия: подставить builder во ВСЕ ордера этого аккаунта (если включена).
+    # builder-комиссия: подмешать builder во ВСЕ ордера аккаунта (если включена).
     # Выключено (builder=None) -> обёрток нет, поведение 1-в-1 прежнее.
     if builder:
-        _bo, _bc = ex.market_open, ex.market_close
-        ex.market_open = lambda *a, **k: _bo(*a, **{"builder": builder, **k})
-        ex.market_close = lambda *a, **k: _bc(*a, **{"builder": builder, **k})
+        _attach_builder(ex, builder)
     ueth_before = spot_free(info, addr, ETH_TOKEN)
     usdc_before = spot_free(info, addr, "USDC")
     spot_px = get_mid(info, spot_coin)
