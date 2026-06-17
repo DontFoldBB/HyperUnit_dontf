@@ -683,7 +683,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
     print(f"\n  Бюджет: {fmt(budget)} | маржа на сделку ({pct}%): {fmt(base_margin)}{cap_note} | плечо {lev}x")
 
     # Заданный % — это ВСЯ маржа на одну сделку. Фазы идут по очереди, маржа переиспользуется.
-    # HIP-3 держит 1 позицию → берёт маржу целиком. Пара перпов держит 2 ноги сразу →
+    # HIP-3 держит 1 позицию → берёт маржу целиком. Пара перпов держит 2 позиции сразу →
     # ДЕЛИТ ту же маржу пополам (НЕ удваивает площадку). Один перп → целиком.
     perp_conc = 2 if perp_kind == "pair" else 1
     per_margin_hip = base_margin if hip3_assets else 0.0
@@ -691,7 +691,7 @@ def run(ex, info, addr, spot_coin, spot_szdec, specs, hip3_assets, perp_kind, pe
     if hip3_assets:
         print(f"    HIP-3:  {fmt(per_margin_hip)} маржи на позицию")
     if perp_kind == "pair":
-        print(f"    Perps:  {fmt(per_margin_perp)} × 2 ноги = {fmt(per_margin_perp * 2)} маржи (та же сумма, поделена)")
+        print(f"    Perps:  {fmt(per_margin_perp)} маржи на позицию (пара {perp_arg[0]}/{perp_arg[1]})")
     elif perp_kind:
         print(f"    Perps:  {fmt(per_margin_perp)} маржи на позицию")
 
