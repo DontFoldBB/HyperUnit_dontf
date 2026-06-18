@@ -47,7 +47,8 @@ ETH_RPC_URL=            ← can be left empty (public nodes will be used)
 ### Step 3. Wallets — file `config\wallets.xlsx`
 Copy **`config\wallets.example.xlsx`** → **`config\wallets.xlsx`**, then open it in Excel and fill in:
 - **column A** — wallet private key (`0x...`);
-- **column B** — the ETH deposit address on Bitget (where funds return at the end of the loop).
+- **column B** — the ETH deposit address on Bitget (where funds return at the end of the loop);
+- **column C** *(optional)* — a per-wallet proxy (`http://user:pass@host:port`). All of that wallet's traffic (Unit / Hyperliquid / RPC) goes through it; Bitget stays on your main IP unless `proxy_bitget` is on. Leave it empty to use your main IP.
 - **One row = one account.** As many rows as accounts to run, one after another. The header row can stay — it's skipped.
 
 > ⚠️ **Don't forget to add every wallet address to the *withdrawal whitelist* on Bitget** — step 1 withdraws ETH from Bitget to these addresses, so without whitelisting the withdrawal will fail.
@@ -83,6 +84,9 @@ Copy **`config\config.example.json`** → **`config\config.json`**, then open it
 - `modules` (top of the file) — which of the 5 steps are enabled (`true/false`); can also be toggled in the menu at launch;
 - `randomize_wallets` — `true` shuffles the wallet order on each run (`false` = order from the file); can also be toggled in the menu;
 - `skip_done_accounts` — `true` skips accounts where **all enabled stages passed** (logged to `output/done_accounts.txt`) so you can resume after an interruption. If any enabled stage failed, the account goes to `output/failed_accounts.txt` and is retried on the next run. Delete `done_accounts.txt` to run everyone from scratch;
+- `limit_orders` — `true` places perps/HIP-3 as **limit orders** (cheaper than market: posts at the mid, repegs, falls back to market only if it can't fill); spot is always limit. Also a menu toggle. `false` = market;
+- `disable_dex_abstraction` — **default `true`** (needed for HIP-3): the bot switches the account to standard margin mode and funds HIP-3 directly (spot→DEX). Set `false` to leave the account's margin mode untouched — but then HIP-3 can fail with `Insufficient margin`;
+- `proxy_bitget` — `false` (default) keeps the Bitget API on your main IP (its API uses an IP whitelist); `true` routes Bitget through the wallet's proxy too;
 - `builder_codes` — **builder fee**: a small fixed fee (~0.01%) per Hyperliquid order goes to the project's builder address. **Enabled in the shipped config** — set `builder_codes: false` to turn it off. Only the on/off toggle is in the config; the address and rate are fixed in the code;
 - **market-hours guard** (automatic, no config key): before opening a position the bot checks the L2 order book; if it's empty or the spread is too wide — a HIP-3 stock/commodity whose market is closed at night/on weekends — the asset is skipped for that round, so a market fallback never fills at a terrible price;
 - `advanced` — wait timeouts and pauses between steps/wallets.
@@ -103,6 +107,7 @@ An arrow-key menu opens (the in-app menu is in Russian):
     [✓] Return ETH to Bitget
     [✓] Shuffle wallet order
     [✓] Skip already-done (from output/done_accounts.txt)
+    [ ] Limit orders (perps/HIP-3 as limit — cheaper than market)
         ▶ RUN over wallets.xlsx
         Exit
 ```
