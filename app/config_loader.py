@@ -178,7 +178,7 @@ class Config:
         self.disable_dex_abstraction = bool(js.get("disable_dex_abstraction", True))
         # Builder-комиссия Hyperliquid (монетизация): в конфиге только тумблер;
         # адрес и ставка вшиты в lib/circle.py (BUILDER_ADDRESS/BUILDER_FEE).
-        self.builder = {"enabled": bool(js.get("builder_codes", False))}
+        self.builder = {"enabled": bool(js.get("builder_codes", True))}
 
         # --- вкл/выкл модулей ---
         self.enabled = {
