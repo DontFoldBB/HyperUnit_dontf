@@ -173,9 +173,9 @@ class Config:
         self.proxy = ""
         # пускать ли Bitget тоже через прокси. По умолчанию НЕТ (его API на IP-whitelist — основной IP)
         self.proxy_bitget = bool(js.get("proxy_bitget", False))
-        # выключать DEX abstraction перед торговлей (стандартный режим маржи). По умолчанию НЕТ —
-        # режим аккаунта не трогаем. Включай, только если переводы USDC падают 'Cannot transfer…'.
-        self.disable_dex_abstraction = bool(js.get("disable_dex_abstraction", False))
+        # выключать DEX abstraction перед торговлей (стандартный режим маржи). ПО УМОЛЧАНИЮ true —
+        # нужно для HIP-3 (бот фондит площадку напрямую spot→DEX). false = режим аккаунта не трогать.
+        self.disable_dex_abstraction = bool(js.get("disable_dex_abstraction", True))
         # Builder-комиссия Hyperliquid (монетизация): в конфиге только тумблер;
         # адрес и ставка вшиты в lib/circle.py (BUILDER_ADDRESS/BUILDER_FEE).
         self.builder = {"enabled": bool(js.get("builder_codes", False))}
