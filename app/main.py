@@ -820,7 +820,7 @@ def menu_loop(cfg, args):
         lim = "[✓ ВКЛ ]" if getattr(cfg, "limit_orders", False) else "[✗ выкл]"
         print(f"    l) {lim}  Лимитки (перпы/HIP-3 лимит-ордерами — дешевле маркета)")
         rf = "[✓ ВКЛ ]" if getattr(cfg, "resume_failed", True) else "[✗ выкл]"
-        print(f"    f) {rf}  Дотягивать упавшие аккаунты (первыми + только вывод/возврат)")
+        print(f"    f) {rf}  Дотягивать упавшие аккаунты (из output/failed_accounts.txt)")
         print(f"    s) ▶ ЗАПУСТИТЬ по wallets.xlsx:  {cyc_str}")
         print("    0) Выход")
         choice = input("  Выбор: ").strip().lower()

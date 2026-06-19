@@ -170,7 +170,7 @@ def _rows(cfg):
     rf = getattr(cfg, "resume_failed", True)
     fbox_c = f"{GREEN}[✓]{RESET}" if rf else f"{GREY}[ ]{RESET}"
     fbox_p = "[✓]" if rf else "[ ]"
-    fname = "Дотягивать упавшие аккаунты (первыми + только вывод/возврат)"
+    fname = "Дотягивать упавшие аккаунты (из output/failed_accounts.txt)"
     rows.append(("opt:resume_failed", f"{fbox_c} {CYAN}{fname}{RESET}", f"{fbox_p} {fname}"))
 
     cyc = _cycle_str(cfg)
