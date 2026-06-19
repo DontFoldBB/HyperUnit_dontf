@@ -84,6 +84,8 @@ Copy **`config\config.example.json`** → **`config\config.json`**, then open it
 - `modules` (top of the file) — which of the 5 steps are enabled (`true/false`); can also be toggled in the menu at launch;
 - `randomize_wallets` — `true` shuffles the wallet order on each run (`false` = order from the file); can also be toggled in the menu;
 - `skip_done_accounts` — `true` skips accounts where **all enabled stages passed** (logged to `output/done_accounts.txt`) so you can resume after an interruption. If any enabled stage failed, the account goes to `output/failed_accounts.txt` and is retried on the next run. Delete `done_accounts.txt` to run everyone from scratch;
+- `resume_failed` — `true` (also a menu toggle, key `f`): accounts that failed/were interrupted before (from `output/failed_accounts.txt`) go **first** in the queue on the next run, and if their funds are already on Hyperliquid (deposit went through, then something failed) the bot **skips Bitget+deposit and does withdraw+return only** — so stuck money is recovered fast, without an extra round-trip. An account is removed from `failed_accounts.txt` once it completes successfully;
+- **network resilience** (automatic, base behaviour — no toggle): if Hyperliquid drops mid-cycle the bot does **not** abandon the account — it waits for the network to come back (pinging it) and retries the failed read-step (safe — it never repeats a send/deposit). If the network doesn't recover within `network_wait_max_min` (advanced, default 30 min, `0` = no limit) the run stops and the stuck account is retried first next time;
 - `limit_orders` — `true` places perps/HIP-3 as **limit orders** (cheaper than market: posts at the mid, repegs, falls back to market only if it can't fill); spot is always limit. Also a menu toggle. `false` = market;
 - `disable_dex_abstraction` — **default `true`** (needed for HIP-3): the bot switches the account to standard margin mode and funds HIP-3 directly (spot→DEX). Set `false` to leave the account's margin mode untouched — but then HIP-3 can fail with `Insufficient margin`;
 - `proxy_bitget` — `false` (default) keeps the Bitget API on your main IP (its API uses an IP whitelist); `true` routes Bitget through the wallet's proxy too;
@@ -108,6 +110,7 @@ An arrow-key menu opens (the in-app menu is in Russian):
     [✓] Shuffle wallet order
     [✓] Skip already-done (from output/done_accounts.txt)
     [ ] Limit orders (perps/HIP-3 as limit — cheaper than market)
+    [✓] Resume failed accounts first (+ withdraw/return only)
         ▶ RUN over wallets.xlsx
         Exit
 ```

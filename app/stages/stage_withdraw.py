@@ -42,13 +42,13 @@ def run(cfg, live):
     try:
         token = hw.hl_find_token(False)
     except Exception as e:
-        return {"stage": "withdraw", "ok": False,
+        return {"stage": "withdraw", "ok": False, "retry_safe": True,
                 "summary": f"Hyperliquid: {e}", "spent": {}, "raw": {}}
 
     w = {"pk": cfg.private_key, "dest": None, "amount": args.amount}
     plan = hw.plan_wallet(token, guardians, w, args)
     if not plan.get("ok"):
-        return {"stage": "withdraw", "ok": False,
+        return {"stage": "withdraw", "ok": False, "retry_safe": True,
                 "summary": f"пропуск ({plan.get('reason')})", "spent": {}, "raw": {}}
 
     print(f"  Кошелёк: {plan['sender']}")

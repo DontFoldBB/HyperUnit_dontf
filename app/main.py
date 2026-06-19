@@ -277,35 +277,82 @@ def load_done_accounts():
     return done
 
 
+def _read_progress_lines(path):
+    """Содержательные строки файла прогресса (без шапки-комментариев) — для перезаписи."""
+    out = []
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                t = line.rstrip("\n")
+                if not t.strip() or t.strip().startswith("#"):
+                    continue
+                out.append(t)
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    return out
+
+
+def load_failed_accounts():
+    """Множество адресов (lower) аккаунтов, которым нужен повтор, из output/failed_accounts.txt."""
+    failed = set()
+    for ln in _read_progress_lines(FAILED_FILE):
+        parts = ln.split()
+        a = parts[0].lower() if parts else ""
+        if a.startswith("0x"):
+            failed.add(a)
+    return failed
+
+
+def _rewrite_failed(keep_lines):
+    """Перезаписать failed_accounts.txt заданными строками (с шапкой)."""
+    with open(FAILED_FILE, "w", encoding="utf-8") as fh:
+        fh.write("# Упавшие аккаунты, которым нужен повтор (адрес + время UTC + упавшие стадии).\n"
+                 "# При успешном повторе строка убирается отсюда автоматически.\n")
+        for ln in keep_lines:
+            fh.write(ln + "\n")
+
+
+def _remove_from_failed(addr):
+    """Убрать адрес из failed_accounts.txt (аккаунт восстановился)."""
+    try:
+        if not os.path.isfile(FAILED_FILE):
+            return
+        _rewrite_failed([ln for ln in _read_progress_lines(FAILED_FILE) if not ln.lower().startswith(addr)])
+    except Exception:
+        pass
+
+
 def mark_account_done(address):
-    """Дописать адрес аккаунта в output/done_accounts.txt (с меткой времени UTC)."""
+    """Дописать адрес в done_accounts.txt И убрать его из failed_accounts.txt (восстановился)."""
     if not address:
         return
+    addr = address.lower()
     try:
         new = not os.path.isfile(DONE_FILE)
         with open(DONE_FILE, "a", encoding="utf-8") as fh:
             if new:
                 fh.write("# Уже сделанные аккаунты (адрес + время UTC). "
                          "Удали этот файл, чтобы пройти всех заново.\n")
-            fh.write(f"{address.lower()}  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}\n")
+            fh.write(f"{addr}  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}\n")
     except Exception as e:
         print(f"  ⚠ не записал прогресс ({os.path.basename(DONE_FILE)}): {e}")
+    _remove_from_failed(addr)
 
 
 def mark_account_failed(address, results):
-    """Записать упавший аккаунт в output/failed_accounts.txt (адрес + время + упавшие стадии).
-    В done он НЕ попадает → на следующем запуске пройдёт заново (авто-ретрай)."""
+    """Записать/обновить упавший аккаунт в output/failed_accounts.txt — ОДНА строка на адрес.
+    В done НЕ попадает → на следующем запуске пройдёт заново (и первым, если resume_failed)."""
     if not address:
         return
+    addr = address.lower()
     bad = [str(r.get("stage")) for r in (results or []) if not r.get("ok")]
+    line = (f"{addr}  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}  "
+            f"стадии: {', '.join(bad) or '?'}")
     try:
-        new = not os.path.isfile(FAILED_FILE)
-        with open(FAILED_FILE, "a", encoding="utf-8") as fh:
-            if new:
-                fh.write("# Упавшие аккаунты (адрес + время UTC + упавшие стадии). "
-                         "В done НЕ попадают — пройдут заново при следующем запуске.\n")
-            fh.write(f"{address.lower()}  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}  "
-                     f"стадии: {', '.join(bad) or '?'}\n")
+        kept = [ln for ln in _read_progress_lines(FAILED_FILE) if not ln.lower().startswith(addr)]
+        _rewrite_failed(kept + [line])
     except Exception as e:
         print(f"  ⚠ не записал {os.path.basename(FAILED_FILE)}: {e}")
 
@@ -410,6 +457,85 @@ def _pick_delay(spec):
         return 0.0
 
 
+# --------------------------------------------------------------------------- #
+#  Устойчивость к обрыву сети Hyperliquid (БАЗА — всегда вкл)                  #
+# --------------------------------------------------------------------------- #
+_NET_ERR_SIGNS = (
+    "timed out", "timeout", "connectionpool", "max retries", "connection aborted",
+    "connectionerror", "proxyerror", "sslerror", "failed to establish", "newconnection",
+    "getaddrinfo", "connection refused", "connection reset", "name resolution",
+    "remote end closed", "read timed out", "temporarily unavailable",
+)
+
+
+def _is_net_err(r):
+    """Похоже ли падение стадии на СЕТЕВОЙ сбой (а не бизнес-ошибку)."""
+    s = str((r or {}).get("summary", "")).lower()
+    return any(sign in s for sign in _NET_ERR_SIGNS)
+
+
+def _hl_alive():
+    """Жив ли Hyperliquid API (через текущий прокси-контекст). Лёгкий запрос."""
+    import requests
+    try:
+        return requests.post("https://api.hyperliquid.xyz/info",
+                             json={"type": "meta"}, timeout=12).status_code == 200
+    except Exception:
+        return False
+
+
+def _wait_for_hl(max_min):
+    """Ждать восстановления Hyperliquid: пинг, пока не оживёт или не выйдет лимит (мин; 0 = без лимита).
+    Ctrl+C прерывает. -> True (ожил) | False (вышел лимит)."""
+    deadline = time.time() + max_min * 60 if max_min and max_min > 0 else None
+    start = time.time()
+    while True:
+        if _hl_alive():
+            el = int(time.time() - start)
+            print(C.ok(f"  ✓ Hyperliquid снова доступен (ждал ~{el // 60} мин {el % 60}с) — продолжаю."))
+            return True
+        if deadline and time.time() >= deadline:
+            return False
+        print(C.dim("    …Hyperliquid всё ещё недоступен, жду 30с (Ctrl+C — стоп)…"))
+        time.sleep(30)
+
+
+def _hl_funds_usd(private_key):
+    """~$ средств аккаунта на Hyperliquid (спот UETH+USDC, перп, dex). None — не смог прочитать."""
+    try:
+        import circle
+        st = circle.account_status(private_key)
+        return (float(st.get("ueth_usd", 0) or 0) + float(st.get("usdc_spot", 0) or 0)
+                + float(st.get("usdc_perp", 0) or 0) + float(st.get("usdc_dex", 0) or 0))
+    except Exception:
+        return None
+
+
+def _run_stage_with_net_wait(key, cfg, live):
+    """run_one, устойчивый к обрыву сети HL:
+      • сетевой сбой ДО отправки (retry_safe) → ждём восстановления HL и повторяем ту же стадию;
+      • сетевой сбой во время/после отправки → повтор НЕБЕЗОПАСЕН (риск двойной отправки): если HL
+        реально лёг — ставим _network_stop (остановить прогон), но не повторяем.
+    Сеть не вернулась за network_wait_max_min → _network_stop."""
+    max_min = float(getattr(cfg, "network_wait_max_min", 30) or 0)
+    while True:
+        r = run_one(key, cfg, live)
+        if r.get("ok") or not _is_net_err(r):
+            return r
+        if r.get("retry_safe"):
+            print(C.warn(f"  ⏳ Сеть Hyperliquid недоступна — жду восстановления и повторю «{STAGES[key][0]}»…"))
+            if not _wait_for_hl(max_min):
+                print(C.err(f"  ⛔ Сеть не вернулась за {max_min:g} мин — останавливаю прогон."))
+                r["_network_stop"] = True
+                return r
+            continue
+        if not _hl_alive():
+            print(C.err("  ⛔ Hyperliquid недоступен, а стадию повторить нельзя (могла уйти отправка). "
+                        "Останавливаю прогон — проверь аккаунт/перезапусти."))
+            r["_network_stop"] = True
+        return r
+
+
 def run_stage_list(keys, cfg, live, is_cycle, assume_yes):
     results = []
     ok_by_stage = {}   # стадия -> успех (для проверки зависимостей в этом прогоне)
@@ -427,10 +553,12 @@ def run_stage_list(keys, cfg, live, is_cycle, assume_yes):
             ok_by_stage[key] = False
             print_stage_result(r)
             continue
-        r = run_one(key, cfg, live)
+        r = _run_stage_with_net_wait(key, cfg, live)
         ok_by_stage[key] = bool(r.get("ok"))
         results.append(r)
         print_stage_result(r)
+        if r.get("_network_stop"):
+            return results   # сеть HL легла — прекращаем стадии аккаунта; флаг увидит цикл по кошелькам
         if is_cycle and not r.get("ok") and i < len(keys):
             print(C.warn("  ⚠ Стадия не удалась — зависимые шаги будут пропущены."))
         # человеческая пауза перед следующим модулем
@@ -500,6 +628,14 @@ def _run_wallets(cfg, args, keys):
     if getattr(cfg, "randomize_wallets", False) and len(wallets) > 1:
         random.shuffle(wallets)
         print(C.dim("  🔀 Порядок кошельков: случайный (этот запуск)"))
+    # Дотягивать упавшие первыми: аккаунты из failed_accounts.txt — в начало очереди (на них могли
+    # остаться средства на HL). Стабильная сортировка: упавшие вперёд, остальные — как были.
+    failed_set = load_failed_accounts() if getattr(cfg, "resume_failed", True) else set()
+    if failed_set:
+        n_fail = sum(1 for w in wallets if (_addr_of(w.get("private_key")) or "") in failed_set)
+        if n_fail:
+            wallets.sort(key=lambda w: 0 if (_addr_of(w.get("private_key")) or "") in failed_set else 1)
+            print(C.warn(f"  ↑ {n_fail} упавших ранее — первыми в очереди (могли остаться средства на HL)"))
     print(C.header(f"\n▶ ЗАПУСК: {len(wallets)} аккаунт(ов) | стадии: "
                    + " → ".join(str(CYCLE_ORDER.index(k) + 1) for k in keys)))
     # Перед стартом: перевести остатки с субаккаунтов Bitget на мейн (вдруг застряли с прошлого прогона).
@@ -538,17 +674,32 @@ def _run_wallets(cfg, args, keys):
             print(C.warn("  ⚠ прокси не задан (столбец C в wallets.xlsx) — аккаунт идёт на ОСНОВНОМ IP"))
         # Весь HTTP-трафик аккаунта — через его прокси (Bitget исключён, если proxy_bitget=false).
         with net_proxy.account_proxy(proxy, bitget_through_proxy=getattr(cfg, "proxy_bitget", False)):
-            results = run_stage_list(keys, wcfg, True, is_cycle=(len(keys) > 1), assume_yes=True)
+            account_keys = keys
+            # Умный перезапуск: упавший аккаунт, у которого средства УЖЕ на HL (депозит прошёл,
+            # а дальше упало) — не повторяем bitget+deposit, гоним только вывод+возврат.
+            if failed_set and (wcfg.address or "").lower() in failed_set:
+                hl_usd = _hl_funds_usd(wcfg.private_key)
+                only = [k for k in keys if k in ("withdraw", "bitget_return")]
+                if hl_usd is not None and hl_usd >= 5.0 and only:
+                    account_keys = only
+                    print(C.warn(f"  💡 на Hyperliquid уже ~${hl_usd:.0f} (депозит прошёл ранее) — "
+                                 f"пропускаю bitget/депозит, только вывод+возврат"))
+            results = run_stage_list(account_keys, wcfg, True, is_cycle=(len(account_keys) > 1), assume_yes=True)
             price = _eth_price_usd()
             print_spent_report(results, price)
             save_run_report(wcfg, results, True, price)
         accounts.append({"address": wcfg.address, "results": results, "price": price})
-        # done — ТОЛЬКО если все ВКЛЮЧЁННЫЕ стадии прошли (results = только включённые); иначе failed + повтор
+        net_stop = any(r.get("_network_stop") for r in results)
+        # done — ТОЛЬКО если все стадии прошли; иначе failed + повтор (при стопе по сети — тоже failed)
         if results and all(r.get("ok") for r in results):
             mark_account_done(wcfg.address)
         else:
             mark_account_failed(wcfg.address, results)
             print(C.warn("  ⚠ были ошибки → аккаунт записан в failed_accounts.txt, повторю при следующем запуске"))
+        if net_stop:
+            print(C.err("\n  ⛔ Сеть Hyperliquid недоступна — прогон остановлен. Деньги могли остаться на HL "
+                        "(аккаунт в failed). Перезапусти, когда сеть вернётся — он пойдёт первым и дотянет вывод."))
+            break
         if idx < len(wallets):
             d = _pick_delay(cfg.module_gap_sec)
             if d > 0:
@@ -668,6 +819,8 @@ def menu_loop(cfg, args):
         print(f"    d) {skp}  Пропускать уже сделанные (из output/done_accounts.txt)")
         lim = "[✓ ВКЛ ]" if getattr(cfg, "limit_orders", False) else "[✗ выкл]"
         print(f"    l) {lim}  Лимитки (перпы/HIP-3 лимит-ордерами — дешевле маркета)")
+        rf = "[✓ ВКЛ ]" if getattr(cfg, "resume_failed", True) else "[✗ выкл]"
+        print(f"    f) {rf}  Дотягивать упавшие аккаунты (первыми + только вывод/возврат)")
         print(f"    s) ▶ ЗАПУСТИТЬ по wallets.xlsx:  {cyc_str}")
         print("    0) Выход")
         choice = input("  Выбор: ").strip().lower()
@@ -692,11 +845,15 @@ def menu_loop(cfg, args):
             cfg.limit_orders = not getattr(cfg, "limit_orders", False)
             _persist(cfg)
             continue
+        if choice == "f":                              # вкл/выкл «дотягивать упавшие аккаунты»
+            cfg.resume_failed = not getattr(cfg, "resume_failed", True)
+            _persist(cfg)
+            continue
         if choice in ("s", "go", "run", "запуск", "старт"):
             _do_run(cfg, args)
             input("\n  Enter — вернуться в меню… ")
             continue
-        print("  Не понял. Цифры 1-5 — вкл/выкл, r — случайный порядок, d — пропуск сделанных, l — лимитки, s — запуск, 0 — выход.")
+        print("  Не понял. Цифры 1-5 — вкл/выкл, r — случайный порядок, d — пропуск сделанных, l — лимитки, f — дотягивать упавшие, s — запуск, 0 — выход.")
 
 
 # --------------------------------------------------------------------------- #

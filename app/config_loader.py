@@ -169,6 +169,12 @@ class Config:
         self.limit_orders = bool(js.get("limit_orders", False))
         # резюме после обрыва: пропускать аккаунты, уже записанные в output/done_accounts.txt
         self.skip_done_accounts = bool(js.get("skip_done_accounts", True))
+        # дотягивать упавшие аккаунты: ставить их В НАЧАЛО очереди и (если средства уже на HL)
+        # пропускать bitget+deposit — только вывод+возврат. Тумблер в меню. По умолчанию вкл.
+        self.resume_failed = bool(js.get("resume_failed", True))
+        # сколько ждать восстановления сети HL при обрыве, мин (0 = без лимита); по истечении — стоп.
+        # Само ожидание сети — БАЗА (всегда вкл), тут только верхний предел.
+        self.network_wait_max_min = adv.get("network_wait_max_min", 30)
         # прокси аккаунта (из wallets.xlsx, столбец C) — на каждый кошелёк свой; "" = основной IP
         self.proxy = ""
         # пускать ли Bitget тоже через прокси. По умолчанию НЕТ (его API на IP-whitelist — основной IP)
@@ -347,5 +353,7 @@ def save_toggles(cfg, path=CONFIG_PATH):
                                 getattr(cfg, "skip_done_accounts", True))
     text = _set_or_add_top_bool(text, "limit_orders",
                                 getattr(cfg, "limit_orders", False))
+    text = _set_or_add_top_bool(text, "resume_failed",
+                                getattr(cfg, "resume_failed", True))
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)
