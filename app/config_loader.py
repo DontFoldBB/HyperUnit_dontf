@@ -170,8 +170,8 @@ class Config:
         # резюме после обрыва: пропускать аккаунты, уже записанные в output/done_accounts.txt
         self.skip_done_accounts = bool(js.get("skip_done_accounts", True))
         # дотягивать упавшие аккаунты: ставить их В НАЧАЛО очереди и (если средства уже на HL)
-        # пропускать bitget+deposit — только вывод+возврат. Тумблер в меню. По умолчанию вкл.
-        self.resume_failed = bool(js.get("resume_failed", True))
+        # пропускать bitget+deposit — только вывод+возврат. Тумблер в меню. По умолчанию ВЫКЛ.
+        self.resume_failed = bool(js.get("resume_failed", False))
         # сколько ждать восстановления сети HL при обрыве, мин (0 = без лимита); по истечении — стоп.
         # Само ожидание сети — БАЗА (всегда вкл), тут только верхний предел.
         self.network_wait_max_min = adv.get("network_wait_max_min", 30)
@@ -354,6 +354,6 @@ def save_toggles(cfg, path=CONFIG_PATH):
     text = _set_or_add_top_bool(text, "limit_orders",
                                 getattr(cfg, "limit_orders", False))
     text = _set_or_add_top_bool(text, "resume_failed",
-                                getattr(cfg, "resume_failed", True))
+                                getattr(cfg, "resume_failed", False))
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)

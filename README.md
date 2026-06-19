@@ -110,7 +110,7 @@ An arrow-key menu opens (the in-app menu is in Russian):
     [✓] Shuffle wallet order
     [✓] Skip already-done (from output/done_accounts.txt)
     [ ] Limit orders (perps/HIP-3 as limit — cheaper than market)
-    [✓] Resume failed accounts (from output/failed_accounts.txt)
+    [ ] Resume failed accounts (from output/failed_accounts.txt)
         ▶ RUN over wallets.xlsx
         Exit
 ```

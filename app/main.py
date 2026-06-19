@@ -630,7 +630,7 @@ def _run_wallets(cfg, args, keys):
         print(C.dim("  🔀 Порядок кошельков: случайный (этот запуск)"))
     # Дотягивать упавшие первыми: аккаунты из failed_accounts.txt — в начало очереди (на них могли
     # остаться средства на HL). Стабильная сортировка: упавшие вперёд, остальные — как были.
-    failed_set = load_failed_accounts() if getattr(cfg, "resume_failed", True) else set()
+    failed_set = load_failed_accounts() if getattr(cfg, "resume_failed", False) else set()
     if failed_set:
         n_fail = sum(1 for w in wallets if (_addr_of(w.get("private_key")) or "") in failed_set)
         if n_fail:
@@ -819,7 +819,7 @@ def menu_loop(cfg, args):
         print(f"    d) {skp}  Пропускать уже сделанные (из output/done_accounts.txt)")
         lim = "[✓ ВКЛ ]" if getattr(cfg, "limit_orders", False) else "[✗ выкл]"
         print(f"    l) {lim}  Лимитки (перпы/HIP-3 лимит-ордерами — дешевле маркета)")
-        rf = "[✓ ВКЛ ]" if getattr(cfg, "resume_failed", True) else "[✗ выкл]"
+        rf = "[✓ ВКЛ ]" if getattr(cfg, "resume_failed", False) else "[✗ выкл]"
         print(f"    f) {rf}  Дотягивать упавшие аккаунты (из output/failed_accounts.txt)")
         print(f"    s) ▶ ЗАПУСТИТЬ по wallets.xlsx:  {cyc_str}")
         print("    0) Выход")
@@ -846,7 +846,7 @@ def menu_loop(cfg, args):
             _persist(cfg)
             continue
         if choice == "f":                              # вкл/выкл «дотягивать упавшие аккаунты»
-            cfg.resume_failed = not getattr(cfg, "resume_failed", True)
+            cfg.resume_failed = not getattr(cfg, "resume_failed", False)
             _persist(cfg)
             continue
         if choice in ("s", "go", "run", "запуск", "старт"):

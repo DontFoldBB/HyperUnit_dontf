@@ -167,7 +167,7 @@ def _rows(cfg):
     lname = "Лимитки (перпы/HIP-3 лимит-ордерами — дешевле маркета)"
     rows.append(("opt:limit", f"{lbox_c} {CYAN}{lname}{RESET}", f"{lbox_p} {lname}"))
 
-    rf = getattr(cfg, "resume_failed", True)
+    rf = getattr(cfg, "resume_failed", False)
     fbox_c = f"{GREEN}[✓]{RESET}" if rf else f"{GREY}[ ]{RESET}"
     fbox_p = "[✓]" if rf else "[ ]"
     fname = "Дотягивать упавшие аккаунты (из output/failed_accounts.txt)"
@@ -243,7 +243,7 @@ def run_menu(cfg, args, do_run, persist):
                     cfg.limit_orders = not getattr(cfg, "limit_orders", False)
                     persist(cfg)
                 elif kind == "opt:resume_failed":
-                    cfg.resume_failed = not getattr(cfg, "resume_failed", True)
+                    cfg.resume_failed = not getattr(cfg, "resume_failed", False)
                     persist(cfg)
                 elif kind == "run":
                     _exit_fullscreen()          # вывод прогона — на основном экране (останется в истории)
